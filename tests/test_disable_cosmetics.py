@@ -1619,7 +1619,7 @@ class DeploymentTests(unittest.TestCase):
             def fake_patch(_patcher, jobs, _manifest_directory, *, progress):
                 self.assertEqual(len(jobs), 1)
                 patch_source, destination, groups = jobs[0]
-                self.assertEqual(patch_source, source)
+                self.assertTrue(os.path.samefile(patch_source, source))
                 self.assertEqual(groups, 3)
                 destination.parent.mkdir(parents=True)
                 destination.write_bytes(patch_source.read_bytes() + b";groups=3")
