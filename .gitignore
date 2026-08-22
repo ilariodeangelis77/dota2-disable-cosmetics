@@ -1,0 +1,24 @@
+.work/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+model-plan.json
+missing-models.json
+artifacts/
+build/
+dist/
+*.spec
+tools/VpkExtractor/bin/
+tools/VpkExtractor/obj/
+tools/ModelPatcher/bin/
+tools/ModelPatcher/obj/
+
+# Local project-management documents are intentionally not published.
+AGENTS.md
+COSMETICS_ROADMAP.md
+PROJECT_STATUS.md
+REFACTOR_PLAN.md
