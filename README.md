@@ -325,6 +325,14 @@ the isolated synthetic packaged build/status/history/clean lifecycle. It then wr
 checksum, creates `artifacts\Dota2CosmeticDisabler-<version>-win-x64.zip`, and writes an adjacent
 SHA-256 file for the ZIP.
 
+## Automated tests and Windows builds
+
+GitHub Actions builds both compiled-resource helpers and runs the Python source suite on every push
+to `main` and every pull request. The separate Windows release workflow can be started manually and
+runs automatically for future `v*` tags. It invokes the same `build_release.ps1` gate used locally,
+including the packaged GUI and end-to-end smoke tests, then retains the verified ZIP and its SHA-256
+file as a workflow artifact. GitHub-hosted artifacts are test builds and are not code-signed.
+
 ## Why the recognized-language VPK path is expected to work
 
 Dota's current `gameinfo.gi` mounts `dota_*LANGUAGE*` ahead of the normal `dota` game path. Current
