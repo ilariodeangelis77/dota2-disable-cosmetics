@@ -4,6 +4,8 @@ An experimental, client-side tool that replaces many equipped Dota 2 cosmetic **
 
 [Download the latest published release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
 
+[Report a reproducible problem](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues/new/choose)
+
 It does not yet restore sounds, icons, hero scaling, animation/activity modifiers, map cosmetics,
 control-point-only particle rules, or every unusual Arcana/Persona edge case.
 

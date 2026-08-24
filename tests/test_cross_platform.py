@@ -90,5 +90,33 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("tar -czf", script)
 
 
+class GitHubCommunityContractTests(unittest.TestCase):
+    def test_bug_report_form_collects_live_validation_context(self):
+        form_path = PROJECT_ROOT / ".github/ISSUE_TEMPLATE/bug-report.yml"
+        form = form_path.read_text(encoding="utf-8")
+
+        self.assertTrue(form.startswith("name: Cosmetic replacement bug\n"))
+        for field_id in (
+            "disabler-version",
+            "platform",
+            "dota-build",
+            "language-mount",
+            "categories",
+            "observed-in",
+            "cosmetic",
+            "expected",
+            "actual",
+            "regression",
+            "reproduction",
+            "activity-log",
+            "attachments",
+            "confirmations",
+        ):
+            with self.subTest(field_id=field_id):
+                self.assertEqual(form.count(f"    id: {field_id}\n"), 1)
+        self.assertIn("Do not upload Dota game files", form)
+        self.assertIn("I rebuilt the overrides after the current Dota update.", form)
+
+
 if __name__ == "__main__":
     unittest.main()

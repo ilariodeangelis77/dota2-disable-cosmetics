@@ -1,0 +1,151 @@
+name: Cosmetic replacement bug
+description: Report a cosmetic, model, material, particle, build, or cleanup problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Dota 2 Cosmetic Disabler. Please search existing issues first and describe one reproducible problem per report.
+
+        This is an unofficial client-side tool. Do not upload Dota game files or other Valve-owned assets.
+
+  - type: input
+    id: disabler-version
+    attributes:
+      label: Disabler version
+      description: Use the version displayed in the window title or by running the executable with --version.
+      placeholder: "0.9.0-beta.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows x64
+        - Linux x64
+        - macOS Intel
+        - macOS Apple Silicon
+        - Other or source build
+    validations:
+      required: true
+
+  - type: input
+    id: dota-build
+    attributes:
+      label: Installed Dota build
+      description: Copy the installed Dota build shown in the dashboard after pressing Refresh.
+      placeholder: "Steam build ID, or the displayed VPK stamp when no build ID is available"
+    validations:
+      required: true
+
+  - type: input
+    id: language-mount
+    attributes:
+      label: Selected language mount and launch option
+      description: Include both the dashboard selection and the matching Steam launch option.
+      placeholder: "Dutch; -language dutch"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: categories
+    attributes:
+      label: Enabled categories
+      description: Select every category enabled for the build that shows the problem.
+      options:
+        - label: Standard wearables
+        - label: Persona models
+        - label: Hero and model swaps
+        - label: Standalone additional attachments
+        - label: Particles and effects
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: observed-in
+    attributes:
+      label: Where the problem is visible
+      options:
+        - label: Armory or loadout preview
+        - label: Demo Hero
+        - label: Private or custom lobby
+        - label: Build, status, cleanup, or desktop UI
+    validations:
+      required: true
+
+  - type: input
+    id: cosmetic
+    attributes:
+      label: Hero and cosmetic, or affected feature
+      description: Use the exact in-game names when the report concerns a cosmetic.
+      placeholder: "Example: Ancient Apparition — Frozen Nova head"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Describe the default model or effect you expected to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Be specific about leftovers, invisible parts, violet error materials, particles, or application errors.
+      placeholder: Describe exactly what remains or renders incorrectly.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Did this work in an earlier disabler version?
+      options:
+        - Unsure or not previously tested
+        - Yes, this is a regression
+        - No, it has never worked
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      value: |
+        1. Select the categories and language mount.
+        2. Build the overrides.
+        3. Start Dota with the matching launch option.
+        4. Equip or preview the cosmetic.
+        5. Observe the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: activity-log
+    attributes:
+      label: Relevant activity log
+      description: Paste the relevant dashboard activity, NOTICE, WARNING, or error lines. Remove personal paths if desired.
+      render: text
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots and generated report
+      description: Attach screenshots and, when useful, the generated model-plan report or a relevant excerpt. Do not attach files copied from Dota.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Final checks
+      options:
+        - label: I rebuilt the overrides after the current Dota update.
+          required: true
+        - label: The selected Steam launch option matches the language mount used for this build.
+          required: true
+        - label: I have not attached Dota game files or other Valve-owned assets.
+          required: true
