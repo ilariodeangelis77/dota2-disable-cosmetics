@@ -28,6 +28,7 @@ $dotnet9 = if (Test-Path -LiteralPath $localDotnet9 -PathType Leaf) {
 } else {
     (Get-Command dotnet -ErrorAction Stop).Source
 }
+$previousTestExtractor = $env:DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR
 
 Push-Location $projectRoot
 try {
@@ -64,6 +65,12 @@ try {
         throw "The model skin patcher publish failed. Install the .NET 9 SDK."
     }
 
+    $extractorBinary = Join-Path $extractorOutput "Dota2VpkExtractor.exe"
+    if (-not (Test-Path -LiteralPath $extractorBinary -PathType Leaf)) {
+        throw "Published VPK extractor was not found: $extractorBinary"
+    }
+    $env:DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR = $extractorBinary
+
     & $Python -m unittest discover -s tests -v
     if ($LASTEXITCODE -ne 0) {
         throw "The source test suite failed."
@@ -74,10 +81,6 @@ try {
         throw "PyInstaller is missing. Run: $Python -m pip install -r requirements-build.txt"
     }
 
-    $extractorBinary = Join-Path $extractorOutput "Dota2VpkExtractor.exe"
-    if (-not (Test-Path -LiteralPath $extractorBinary -PathType Leaf)) {
-        throw "Published VPK extractor was not found: $extractorBinary"
-    }
     $modelPatcherBinary = Join-Path $modelPatcherOutput "Dota2ModelSkinPatcher.exe"
     if (-not (Test-Path -LiteralPath $modelPatcherBinary -PathType Leaf)) {
         throw "Published model skin patcher was not found: $modelPatcherBinary"
@@ -150,5 +153,6 @@ try {
     Write-Host "Release created: $releaseArchive"
 }
 finally {
+    $env:DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR = $previousTestExtractor
     Pop-Location
 }

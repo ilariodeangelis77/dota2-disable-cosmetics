@@ -1500,6 +1500,9 @@ class PathSafetyTests(unittest.TestCase):
 class DeploymentTests(unittest.TestCase):
     @staticmethod
     def extractor_path():
+        published_extractor = os.environ.get("DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR")
+        if published_extractor:
+            return Path(published_extractor).resolve()
         executable = "Dota2VpkExtractor.exe" if generator.os.name == "nt" else "Dota2VpkExtractor"
         return (
             Path(__file__).resolve().parents[1]
@@ -2191,6 +2194,9 @@ class DeploymentTests(unittest.TestCase):
 class VpkExtractorIntegrationTests(unittest.TestCase):
     @staticmethod
     def extractor_path():
+        published_extractor = os.environ.get("DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR")
+        if published_extractor:
+            return Path(published_extractor).resolve()
         executable = "Dota2VpkExtractor.exe" if generator.os.name == "nt" else "Dota2VpkExtractor"
         return (
             Path(__file__).resolve().parents[1]
