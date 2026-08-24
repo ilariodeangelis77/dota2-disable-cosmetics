@@ -17,10 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  windows-tests:
-    name: Windows source tests
-    runs-on: windows-latest
+  source-tests:
+    name: ${{ matrix.name }} source tests
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-latest
+          - name: Linux x64
+            runner: ubuntu-22.04
+          - name: macOS arm64
+            runner: macos-15
 
     steps:
       - name: Check out source
@@ -43,11 +53,10 @@ jobs:
       - name: Build compiled-resource helpers
         shell: pwsh
         run: |
-          dotnet build .\tools\VpkExtractor\VpkExtractor.csproj --configuration Release --configfile .\NuGet.Config
+          dotnet build ./tools/VpkExtractor/VpkExtractor.csproj --configuration Release --configfile ./NuGet.Config
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build .\tools\ModelPatcher\ModelPatcher.csproj --configuration Release --configfile .\NuGet.Config
+          dotnet build ./tools/ModelPatcher/ModelPatcher.csproj --configuration Release --configfile ./NuGet.Config
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run Python tests
         run: python -m unittest discover -s tests -v
-

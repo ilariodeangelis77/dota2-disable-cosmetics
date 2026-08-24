@@ -2,7 +2,7 @@
 
 An experimental, client-side tool that replaces many equipped Dota 2 cosmetic **model and particle resources** with their corresponding defaults. It reads the current local Dota economy schema on every build, so the mapping can be regenerated after game updates instead of relying on a fixed list of cosmetics.
 
-[Download the latest Windows release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
+[Download the latest tagged release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
 
 It does not yet restore sounds, icons, hero scaling, animation/activity modifiers, map cosmetics,
 control-point-only particle rules, or every unusual Arcana/Persona edge case.
@@ -111,15 +111,20 @@ attachments—stay with the parent category to avoid applying only half of a tra
 
 ## End-user requirements
 
-- 64-bit Windows.
+- Windows x64, Linux x64, or macOS 15+ on Intel or Apple Silicon.
 - An installed Dota 2 client.
 
 The packaged release includes Python plus self-contained VPK and model-skin helpers. End users do not install Python, .NET, ValvePak, ValveResourceFormat, or Source 2 Viewer separately.
 
-## Use the Windows release
+Linux builds target Ubuntu 22.04's glibc baseline. macOS builds are not signed or notarized, and
+GitHub-hosted Windows builds are not code-signed.
 
-Extract the release ZIP and double-click `Dota2CosmeticDisabler.exe`. With no command-line
-arguments, it opens a wide native dashboard that:
+## Use a packaged release
+
+On Windows, extract the `win-x64.zip` archive and double-click
+`Dota2CosmeticDisabler.exe`. On Linux or macOS, extract the matching `.tar.gz` archive and run
+`./Dota2CosmeticDisabler` from a terminal. With no command-line arguments, it opens a wide native
+dashboard that:
 
 - Auto-detects the Dota 2 installation and lets you browse when detection is unavailable.
 - Shows the installed Dota build, the build used for the existing overrides, and a clear status badge.
@@ -133,13 +138,23 @@ The mount-language and category selections are saved locally in `.work/ui-settin
 selected language is recorded in the generated marker and version history, while categories are
 also recorded in the mapping report. Keep the dashboard open while a build or cleanup is running.
 
-The existing CLI remains available. Open PowerShell in the extracted folder and run:
+The existing CLI remains available. Open a terminal in the extracted folder and run the command
+for your platform:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe build
 ```
 
-Steam libraries are auto-detected. If Dota is installed somewhere unusual, pass its root explicitly:
+```bash
+./Dota2CosmeticDisabler build
+```
+
+The remaining command examples use the Windows filename; on Linux and macOS, replace
+`.\Dota2CosmeticDisabler.exe` with `./Dota2CosmeticDisabler`.
+
+Steam libraries are auto-detected on Windows, Linux (including Flatpak Steam), and macOS. Secondary
+libraries from `libraryfolders.vdf` are also searched. If Dota is installed somewhere unusual,
+pass its root explicitly:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe build `
@@ -319,19 +334,29 @@ python -m pip install -r .\requirements-build.txt
 .\scripts\build_release.ps1 -Python python
 ```
 
+On Linux or macOS, run the same cross-platform PowerShell script with `pwsh`, for example:
+
+```bash
+python3 -m pip install -r ./requirements-build.txt
+pwsh ./scripts/build_release.ps1 -Python python3
+```
+
 The script verifies Tcl/Tk, publishes both self-contained .NET helpers, runs the source tests, embeds
-the helpers into a single-file Windows application, and runs both the packaged GUI smoke test and
+the helpers into a native single-file application, and runs both the packaged GUI smoke test and
 the isolated synthetic packaged build/status/history/clean lifecycle. It then writes the executable
-checksum, creates `artifacts\Dota2CosmeticDisabler-<version>-win-x64.zip`, and writes an adjacent
-SHA-256 file for the ZIP.
+checksum, creates a platform-labelled archive, and writes an adjacent SHA-256 file. Windows uses
+`.zip`; Linux and macOS use `.tar.gz` so executable permissions survive extraction. The runtime is
+selected automatically from the host, or can be supplied explicitly as `win-x64`, `linux-x64`,
+`osx-x64`, or `osx-arm64`. Each target must be built on its native operating system.
 
-## Automated tests and Windows builds
+## Automated tests and cross-platform builds
 
-GitHub Actions builds both compiled-resource helpers and runs the Python source suite on every push
-to `main` and every pull request. The separate Windows release workflow can be started manually and
-runs automatically for future `v*` tags. It invokes the same `build_release.ps1` gate used locally,
-including the packaged GUI and end-to-end smoke tests, then retains the verified ZIP and its SHA-256
-file as a workflow artifact. GitHub-hosted artifacts are test builds and are not code-signed.
+GitHub Actions builds both compiled-resource helpers and runs the Python source suite on Windows,
+Linux, and macOS for every push to `main` and every pull request. The release workflow can be
+started manually and runs automatically for future `v*` tags. Native runners build `win-x64`,
+`linux-x64`, `osx-x64`, and `osx-arm64` independently with the same `build_release.ps1` gate,
+including the packaged GUI and end-to-end smoke tests, then retain each verified archive and its
+SHA-256 file as a workflow artifact. GitHub-hosted artifacts are unsigned test builds.
 
 ## Why the recognized-language VPK path is expected to work
 

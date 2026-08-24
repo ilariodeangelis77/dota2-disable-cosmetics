@@ -1,11 +1,43 @@
 [CmdletBinding()]
 param(
     [string]$Python = "python",
-    [ValidateSet("win-x64")]
-    [string]$Runtime = "win-x64"
+    [ValidateSet("auto", "win-x64", "linux-x64", "osx-x64", "osx-arm64")]
+    [string]$Runtime = "auto"
 )
 
 $ErrorActionPreference = "Stop"
+$runtimeInformation = [System.Runtime.InteropServices.RuntimeInformation]
+$osPlatform = [System.Runtime.InteropServices.OSPlatform]
+$onWindows = $runtimeInformation::IsOSPlatform($osPlatform::Windows)
+$onLinux = $runtimeInformation::IsOSPlatform($osPlatform::Linux)
+$onMacOS = $runtimeInformation::IsOSPlatform($osPlatform::OSX)
+$hostArchitecture = $runtimeInformation::OSArchitecture.ToString().ToLowerInvariant()
+
+$expectedRuntime = if ($onWindows -and $hostArchitecture -eq "x64") {
+    "win-x64"
+} elseif ($onLinux -and $hostArchitecture -eq "x64") {
+    "linux-x64"
+} elseif ($onMacOS -and $hostArchitecture -eq "x64") {
+    "osx-x64"
+} elseif ($onMacOS -and $hostArchitecture -eq "arm64") {
+    "osx-arm64"
+} else {
+    throw "Unsupported release host: $($runtimeInformation::OSDescription) $hostArchitecture."
+}
+
+if ($Runtime -eq "auto") {
+    $Runtime = $expectedRuntime
+} elseif ($Runtime -ne $expectedRuntime) {
+    throw "Runtime '$Runtime' must be built on its native '$expectedRuntime' host."
+}
+
+$executableSuffix = if ($onWindows) { ".exe" } else { "" }
+$archiveExtension = if ($onWindows) { ".zip" } else { ".tar.gz" }
+$binarySeparator = if ($onWindows) { ";" } else { ":" }
+$applicationFilename = "Dota2CosmeticDisabler$executableSuffix"
+$extractorFilename = "Dota2VpkExtractor$executableSuffix"
+$modelPatcherFilename = "Dota2ModelSkinPatcher$executableSuffix"
+
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $buildRoot = Join-Path $projectRoot "build"
 $extractorOutput = Join-Path $buildRoot "vpk-extractor"
@@ -13,20 +45,22 @@ $modelPatcherOutput = Join-Path $buildRoot "model-patcher"
 $pyInstallerWork = Join-Path $buildRoot "pyinstaller"
 $pyInstallerDist = Join-Path $buildRoot "package"
 
-$versionFile = Join-Path $projectRoot "dota_disabler\version.py"
+$versionFile = Join-Path $projectRoot "dota_disabler/version.py"
 $versionLine = Select-String -LiteralPath $versionFile -Pattern '^VERSION = "([^"]+)"$'
 if (-not $versionLine) {
-    throw "Could not read the application version from dota_disabler\version.py."
+    throw "Could not read the application version from dota_disabler/version.py."
 }
 $version = $versionLine.Matches[0].Groups[1].Value
 $releaseName = "Dota2CosmeticDisabler-$version-$Runtime"
-$releaseDirectory = Join-Path (Join-Path $projectRoot "artifacts") $releaseName
-$releaseArchive = "$releaseDirectory.zip"
-$localDotnet9 = Join-Path $projectRoot ".work\dotnet9\dotnet.exe"
+$artifactsRoot = Join-Path $projectRoot "artifacts"
+$releaseDirectory = Join-Path $artifactsRoot $releaseName
+$releaseArchive = "$releaseDirectory$archiveExtension"
+$localDotnet9 = Join-Path $projectRoot ".work/dotnet9/dotnet$executableSuffix"
+$dotnet = (Get-Command dotnet -ErrorAction Stop).Source
 $dotnet9 = if (Test-Path -LiteralPath $localDotnet9 -PathType Leaf) {
     $localDotnet9
 } else {
-    (Get-Command dotnet -ErrorAction Stop).Source
+    $dotnet
 }
 $previousTestExtractor = $env:DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR
 
@@ -37,7 +71,7 @@ try {
         throw "The selected Python runtime does not have a working Tcl/Tk installation."
     }
 
-    & dotnet publish "tools\VpkExtractor\VpkExtractor.csproj" `
+    & $dotnet publish "tools/VpkExtractor/VpkExtractor.csproj" `
         --configuration Release `
         --runtime $Runtime `
         --self-contained true `
@@ -50,13 +84,13 @@ try {
         throw "The VPK extractor publish failed."
     }
 
-    & $dotnet9 publish "tools\ModelPatcher\ModelPatcher.csproj" `
+    & $dotnet9 publish "tools/ModelPatcher/ModelPatcher.csproj" `
         --configuration Release `
         --runtime $Runtime `
         --self-contained true `
         --output $modelPatcherOutput `
         --configfile "NuGet.Config" `
-        --packages (Join-Path $projectRoot ".work\nuget-model-patcher") `
+        --packages (Join-Path $projectRoot ".work/nuget-model-patcher") `
         -p:PublishSingleFile=true `
         -p:PublishTrimmed=true `
         -p:TrimMode=link `
@@ -65,7 +99,7 @@ try {
         throw "The model skin patcher publish failed. Install the .NET 9 SDK."
     }
 
-    $extractorBinary = Join-Path $extractorOutput "Dota2VpkExtractor.exe"
+    $extractorBinary = Join-Path $extractorOutput $extractorFilename
     if (-not (Test-Path -LiteralPath $extractorBinary -PathType Leaf)) {
         throw "Published VPK extractor was not found: $extractorBinary"
     }
@@ -81,7 +115,7 @@ try {
         throw "PyInstaller is missing. Run: $Python -m pip install -r requirements-build.txt"
     }
 
-    $modelPatcherBinary = Join-Path $modelPatcherOutput "Dota2ModelSkinPatcher.exe"
+    $modelPatcherBinary = Join-Path $modelPatcherOutput $modelPatcherFilename
     if (-not (Test-Path -LiteralPath $modelPatcherBinary -PathType Leaf)) {
         throw "Published model skin patcher was not found: $modelPatcherBinary"
     }
@@ -90,19 +124,26 @@ try {
         throw "The published model skin patcher failed its version smoke test."
     }
 
-    & $Python -m PyInstaller `
-        --noconfirm `
-        --clean `
-        --onefile `
-        --hide-console hide-early `
-        --noupx `
-        --name "Dota2CosmeticDisabler" `
-        --distpath $pyInstallerDist `
-        --workpath $pyInstallerWork `
-        --specpath $buildRoot `
-        --add-binary "$extractorBinary;tools" `
-        --add-binary "$modelPatcherBinary;tools" `
+    $pyInstallerArguments = @(
+        "-m", "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--onefile"
+    )
+    if ($onWindows) {
+        $pyInstallerArguments += @("--hide-console", "hide-early")
+    }
+    $pyInstallerArguments += @(
+        "--noupx",
+        "--name", "Dota2CosmeticDisabler",
+        "--distpath", $pyInstallerDist,
+        "--workpath", $pyInstallerWork,
+        "--specpath", $buildRoot,
+        "--add-binary", "${extractorBinary}${binarySeparator}tools",
+        "--add-binary", "${modelPatcherBinary}${binarySeparator}tools",
         "disable_cosmetics.py"
+    )
+    & $Python @pyInstallerArguments
     if ($LASTEXITCODE -ne 0) {
         throw "The application packaging step failed."
     }
@@ -113,13 +154,24 @@ try {
     if (Test-Path -LiteralPath $releaseArchive) {
         Remove-Item -LiteralPath $releaseArchive -Force
     }
+    if (Test-Path -LiteralPath "$releaseArchive.sha256") {
+        Remove-Item -LiteralPath "$releaseArchive.sha256" -Force
+    }
     New-Item -ItemType Directory -Path $releaseDirectory | Out-Null
 
-    $applicationBinary = Join-Path $pyInstallerDist "Dota2CosmeticDisabler.exe"
+    $applicationBinary = Join-Path $pyInstallerDist $applicationFilename
     Copy-Item -LiteralPath $applicationBinary -Destination $releaseDirectory
-    Copy-Item -LiteralPath "README.md", "THIRD_PARTY_NOTICES.md" -Destination $releaseDirectory
+    foreach ($document in ("README.md", "THIRD_PARTY_NOTICES.md")) {
+        Copy-Item -LiteralPath $document -Destination $releaseDirectory
+    }
 
-    $releaseBinary = Join-Path $releaseDirectory "Dota2CosmeticDisabler.exe"
+    $releaseBinary = Join-Path $releaseDirectory $applicationFilename
+    if (-not $onWindows) {
+        & chmod +x $releaseBinary
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not make the packaged application executable."
+        }
+    }
     & $releaseBinary --version
     if ($LASTEXITCODE -ne 0) {
         throw "The packaged application failed its version smoke test."
@@ -143,10 +195,17 @@ try {
     }
 
     $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $releaseBinary
-    "$($hash.Hash.ToLowerInvariant())  Dota2CosmeticDisabler.exe" |
+    "$($hash.Hash.ToLowerInvariant())  $applicationFilename" |
         Set-Content -LiteralPath (Join-Path $releaseDirectory "SHA256SUMS.txt") -Encoding ascii
 
-    Compress-Archive -LiteralPath $releaseDirectory -DestinationPath $releaseArchive -CompressionLevel Optimal
+    if ($onWindows) {
+        Compress-Archive -LiteralPath $releaseDirectory -DestinationPath $releaseArchive -CompressionLevel Optimal
+    } else {
+        & tar -czf $releaseArchive -C $artifactsRoot $releaseName
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not create the release archive."
+        }
+    }
     $archiveHash = Get-FileHash -Algorithm SHA256 -LiteralPath $releaseArchive
     "$($archiveHash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($releaseArchive))" |
         Set-Content -LiteralPath "$releaseArchive.sha256" -Encoding ascii

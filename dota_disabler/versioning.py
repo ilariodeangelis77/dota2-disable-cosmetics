@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -40,6 +41,35 @@ def _steam_roots_windows() -> list[Path]:
     return roots
 
 
+def _steam_roots_posix(platform: str, home: Path) -> list[Path]:
+    if platform == "darwin":
+        return [home / "Library/Application Support/Steam"]
+    return [
+        home / ".steam/steam",
+        home / ".local/share/Steam",
+        home / ".var/app/com.valvesoftware.Steam/data/Steam",
+    ]
+
+
+def _dota_install_candidates(steam_roots: list[Path], *, windows_paths: bool) -> list[Path]:
+    candidates: list[Path] = []
+    for steam_root in steam_roots:
+        candidates.append(steam_root / "steamapps/common/dota 2 beta")
+        library_file = steam_root / "steamapps/libraryfolders.vdf"
+        if not library_file.is_file():
+            continue
+        try:
+            contents = library_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for match in re.finditer(r'"path"\s+"([^"]+)"', contents):
+            raw_path = match.group(1)
+            if windows_paths:
+                raw_path = raw_path.replace("\\\\", "\\")
+            candidates.append(Path(raw_path).expanduser() / "steamapps/common/dota 2 beta")
+    return candidates
+
+
 def find_dota_install(explicit: Optional[str]) -> Path:
     if explicit:
         candidate = Path(explicit).expanduser().resolve()
@@ -49,27 +79,12 @@ def find_dota_install(explicit: Optional[str]) -> Path:
             f"Not a Dota 2 install (missing game/dota/pak01_dir.vpk): {candidate}"
         )
 
-    candidates: list[Path] = []
     if os.name == "nt":
-        for steam_root in _steam_roots_windows():
-            candidates.append(steam_root / "steamapps/common/dota 2 beta")
-            library_file = steam_root / "steamapps/libraryfolders.vdf"
-            if not library_file.is_file():
-                continue
-            try:
-                contents = library_file.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            for match in re.finditer(r'"path"\s+"([^"]+)"', contents):
-                library = Path(match.group(1).replace("\\\\", "\\"))
-                candidates.append(library / "steamapps/common/dota 2 beta")
+        candidates = _dota_install_candidates(_steam_roots_windows(), windows_paths=True)
     else:
-        home = Path.home()
-        candidates.extend(
-            (
-                home / ".steam/steam/steamapps/common/dota 2 beta",
-                home / ".local/share/Steam/steamapps/common/dota 2 beta",
-            )
+        candidates = _dota_install_candidates(
+            _steam_roots_posix(sys.platform, Path.home()),
+            windows_paths=False,
         )
 
     seen: set[Path] = set()

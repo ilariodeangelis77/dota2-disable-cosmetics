@@ -1,0 +1,81 @@
+name: Cross-platform release builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.runtime }} release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            runtime: win-x64
+            archive: zip
+          - runner: ubuntu-22.04
+            runtime: linux-x64
+            archive: tar.gz
+          - runner: macos-15-intel
+            runtime: osx-x64
+            archive: tar.gz
+          - runner: macos-15
+            runtime: osx-arm64
+            archive: tar.gz
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Set up .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+
+      - name: Install Linux GUI test display
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+
+      - name: Build and verify release
+        if: runner.os != 'Linux'
+        shell: pwsh
+        run: ./scripts/build_release.ps1 -Python (Get-Command python).Source -Runtime '${{ matrix.runtime }}'
+
+      - name: Build and verify Linux release
+        if: runner.os == 'Linux'
+        shell: bash
+        run: xvfb-run --auto-servernum pwsh -NoLogo -NoProfile -File ./scripts/build_release.ps1 -Python "$(command -v python)" -Runtime '${{ matrix.runtime }}'
+
+      - name: Upload verified release
+        uses: actions/upload-artifact@v6
+        with:
+          name: Dota2CosmeticDisabler-${{ github.ref_name }}-${{ matrix.runtime }}
+          path: |
+            artifacts/Dota2CosmeticDisabler-*-${{ matrix.runtime }}.${{ matrix.archive }}
+            artifacts/Dota2CosmeticDisabler-*-${{ matrix.runtime }}.${{ matrix.archive }}.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
