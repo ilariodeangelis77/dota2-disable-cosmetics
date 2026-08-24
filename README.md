@@ -2,7 +2,7 @@
 
 An experimental, client-side tool that replaces many equipped Dota 2 cosmetic **model and particle resources** with their corresponding defaults. It reads the current local Dota economy schema on every build, so the mapping can be regenerated after game updates instead of relying on a fixed list of cosmetics.
 
-[Download the latest tagged release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
+[Download the latest published release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
 
 It does not yet restore sounds, icons, hero scaling, animation/activity modifiers, map cosmetics,
 control-point-only particle rules, or every unusual Arcana/Persona edge case.
@@ -25,7 +25,7 @@ files, selects a free `pak90`–`pak98` slot, and prevents overlapping build/cle
 the same Dota installation. Deployment keeps the previous owned archive available until the
 replacement marker is safely written and rolls the archive back if marker persistence fails.
 
-## What v0.8.1 maps
+## What v0.9.0-beta.1 maps
 
 - Normal `model_player` wearables to the hero/slot `baseitem` model.
 - Wearables whose default slot is integrated into the hero body to Dota's existing invisible model,
@@ -71,7 +71,8 @@ were packed and CRC-validated with no missing required source models. The instal
 matches its marker, and the user confirmed that the Dutch mount applies the overrides in Armory and
 Demo Hero. A representative category-by-category visual matrix is still pending.
 
-The 0.8.1 planner was regenerated from installed Dota Steam build `24869441` on 2026-08-22 and
+The mapping baseline carried into 0.9.0-beta.1 was regenerated from installed Dota Steam build
+`24869441` on 2026-08-22 and
 passed an isolated 16,440-entry VPK pack/reopen/CRC round trip without deploying or missing a final
 source resource. It contains 10,860 model, 112 material, 5,227 particle, and 241 snapshot mappings.
 The item-scoped skin fix restores 1,147 valid default-model mappings that the previous bundle-wide
@@ -355,8 +356,15 @@ GitHub Actions builds both compiled-resource helpers and runs the Python source 
 Linux, and macOS for every push to `main` and every pull request. The release workflow can be
 started manually and runs automatically for future `v*` tags. Native runners build `win-x64`,
 `linux-x64`, `osx-x64`, and `osx-arm64` independently with the same `build_release.ps1` gate,
-including the packaged GUI and end-to-end smoke tests, then retain each verified archive and its
-SHA-256 file as a workflow artifact. GitHub-hosted artifacts are unsigned test builds.
+including the packaged GUI and end-to-end smoke tests. Manual runs retain each verified archive and
+its SHA-256 file as a temporary workflow artifact for 30 days.
+
+A version tag must exactly match `dota_disabler/version.py`. After every native tag build passes,
+the workflow validates all four archive checksums and creates a draft GitHub Release containing the
+four archives and their adjacent SHA-256 files. SemVer prerelease tags such as
+`v0.9.0-beta.1` are marked as prereleases. Rerunning a tag can refresh its draft assets, but the
+workflow refuses to overwrite an already-published release. A maintainer reviews the generated
+notes and assets before publishing the draft. GitHub-hosted archives remain unsigned builds.
 
 ## Why the recognized-language VPK path is expected to work
 

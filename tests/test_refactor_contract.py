@@ -68,7 +68,10 @@ class PublicFacadeContractTests(unittest.TestCase):
         version_module = importlib.import_module("dota_disabler.version")
 
         self.assertIsInstance(legacy.VERSION, str)
-        self.assertRegex(legacy.VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertRegex(
+            legacy.VERSION,
+            r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$",
+        )
         self.assertEqual(legacy.VERSION, version_module.VERSION)
 
 

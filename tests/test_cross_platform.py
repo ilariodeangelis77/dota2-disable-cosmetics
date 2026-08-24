@@ -64,6 +64,22 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("actions/upload-artifact@v6", workflow)
         self.assertIn("xvfb-run --auto-servernum", workflow)
 
+    def test_tag_builds_create_only_a_verified_draft_release(self):
+        workflow = (PROJECT_ROOT / ".github/workflows/build-releases.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Verify release tag matches application version", workflow)
+        self.assertIn("needs: build", workflow)
+        self.assertIn("actions/download-artifact@v6", workflow)
+        self.assertIn("sha256sum --check", workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn('gh release view "$tag" --json isDraft', workflow)
+        self.assertIn('release create "$tag" "${assets[@]}"', workflow)
+        self.assertIn("--draft", workflow)
+        self.assertIn("create_args+=(--prerelease)", workflow)
+        self.assertIn('gh release upload "$tag" "${assets[@]}" --clobber', workflow)
+        self.assertIn("Refusing to overwrite the already-published release", workflow)
+
     def test_release_script_rejects_cross_compilation_and_preserves_posix_modes(self):
         script = (PROJECT_ROOT / "scripts/build_release.ps1").read_text(encoding="utf-8")
         for runtime in ("win-x64", "linux-x64", "osx-x64", "osx-arm64"):

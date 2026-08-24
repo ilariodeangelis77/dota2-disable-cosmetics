@@ -59,6 +59,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes xvfb
 
+      - name: Verify release tag matches application version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $applicationVersion = (& python -c "from dota_disabler.version import VERSION; print(VERSION)").Trim()
+          if ("v$applicationVersion" -ne "${{ github.ref_name }}") {
+            throw "Tag '${{ github.ref_name }}' does not match application version '$applicationVersion'."
+          }
+
       - name: Build and verify release
         if: runner.os != 'Linux'
         shell: pwsh
@@ -79,3 +88,85 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+  release:
+    name: Assemble draft GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Download every verified platform archive
+        uses: actions/download-artifact@v6
+        with:
+          pattern: Dota2CosmeticDisabler-${{ github.ref_name }}-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release files and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          application_version="$(python -c 'from dota_disabler.version import VERSION; print(VERSION)')"
+
+          if [[ "$version" != "$application_version" ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match application version '$application_version'."
+            exit 1
+          fi
+
+          for runtime_and_extension in \
+            "win-x64:zip" \
+            "linux-x64:tar.gz" \
+            "osx-x64:tar.gz" \
+            "osx-arm64:tar.gz"
+          do
+            runtime="${runtime_and_extension%%:*}"
+            extension="${runtime_and_extension#*:}"
+            archive="Dota2CosmeticDisabler-${version}-${runtime}.${extension}"
+            test -f "release-assets/$archive"
+            test -f "release-assets/$archive.sha256"
+            (cd release-assets && sha256sum --check "$archive.sha256")
+          done
+
+          file_count="$(find release-assets -maxdepth 1 -type f | wc -l)"
+          if [[ "$file_count" -ne 8 ]]; then
+            echo "::error::Expected exactly four archives and four checksum files; found $file_count files."
+            find release-assets -maxdepth 1 -type f -print
+            exit 1
+          fi
+
+      - name: Create or refresh draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          existing_draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || true)"
+
+          if [[ -z "$existing_draft" ]]; then
+            create_args=(
+              release create "$tag" "${assets[@]}"
+              --title "Dota 2 Cosmetic Disabler $tag"
+              --generate-notes
+              --draft
+              --verify-tag
+            )
+            if [[ "$tag" == *-* ]]; then
+              create_args+=(--prerelease)
+            fi
+            gh "${create_args[@]}"
+          elif [[ "$existing_draft" == "true" ]]; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            echo "::error::Refusing to overwrite the already-published release for $tag."
+            exit 1
+          fi
