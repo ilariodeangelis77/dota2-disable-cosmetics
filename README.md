@@ -1,301 +1,311 @@
-# Dota 2 Cosmetic Disabler
+<h1 align="center">Dota 2 Cosmetic Disabler</h1>
 
-An experimental, client-side tool that replaces many equipped Dota 2 cosmetic **model and particle resources** with their corresponding defaults. It reads the current local Dota economy schema on every build, so the mapping can be regenerated after game updates instead of relying on a fixed list of cosmetics.
+<p align="center">
+  <strong>Restore supported Dota 2 cosmetics to their default models and effects,<br />
+  using only assets from your installed game.</strong>
+</p>
 
-[Download the latest published release](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest)
+<p align="center">
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;logo=github&amp;color=E85D4A" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;logo=github&amp;color=DCA64C" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=for-the-badge&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
+</p>
 
-[Report a reproducible problem](https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues/new/choose)
+<p align="center">
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0 beta 1" src="https://img.shields.io/badge/version-0.9.0--beta.1-E85D4A?style=for-the-badge" /></a>
+  <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=for-the-badge" />
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;color=2EA043" /></a>
+</p>
 
-It does not yet restore sounds, icons, hero scaling, animation/activity modifiers, map cosmetics,
-control-point-only particle rules, or every unusual Arcana/Persona edge case.
+<p align="center">
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><strong>Releases</strong></a>
+  · <a href="#quick-start">Quick start</a>
+  · <a href="#supported-replacements">Features</a>
+  · <a href="#command-line-usage">CLI</a>
+  · <a href="#development">Build from source</a>
+  · <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues/new/choose">Report a bug</a>
+</p>
 
-## Safety boundary
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Dota 2 Cosmetic Disabler desktop dashboard" width="100%" />
+</p>
 
-The generator does not patch `dota2.exe`, inject code, alter VAC, or use `-override_vpk`. It copies
-existing compiled resources from Dota's own VPK into a new manifest-owned VPK under a recognized
-Dota language search path. For skin-sensitive replacements, it can add duplicate base-material
-groups to the copied model's KV3 data while byte-preserving every opaque mesh, skeleton, animation,
-and dependency block. When a cosmetic hides geometry integrated into the hero model, it also
-uses a model-only compatibility fallback; the original Dota files and economy schema are never
-edited or repackaged.
+<p align="center"><sub>The 0.9.0-beta.1 dashboard showing installation detection, category selection, and Dota build status.</sub></p>
 
-That does **not** make this an officially supported Dota feature or provide an anti-cheat guarantee. Valve can change search-path behavior or game policy at any time. Review the generated report, test in a demo/custom lobby first, and stop using the output if the client rejects it.
+> [!IMPORTANT]
+> This project is in beta. It has passed automated, packaged, and live-install schema validation,
+> but the latest mapping changes still require a broader in-game visual pass. Test a new build in the
+> Armory, Demo Hero, or a custom lobby before using it in normal play.
 
-Cleanup is manifest-based: the tool removes only the numbered VPK recorded in its own marker. It
-shares the recognized language directory safely, preserves existing language packs and unrelated
-files, selects a free `pak90`–`pak98` slot, and prevents overlapping build/cleanup operations for
-the same Dota installation. Deployment keeps the previous owned archive available until the
-replacement marker is safely written and rolls the archive back if marker persistence fails.
+Dota 2 Cosmetic Disabler is a self-contained desktop and command-line tool that restores many
+equipped cosmetic models and effects to their default Dota 2 resources. It generates replacements
+from the user's installed game data, allowing the mapping to be rebuilt after Dota updates instead
+of relying on a static cosmetic list.
 
-## What v0.9.0-beta.1 maps
+## Highlights
 
-- Normal `model_player` wearables to the hero/slot `baseitem` model.
-- Wearables whose default slot is integrated into the hero body to Dota's existing invisible model,
-  allowing the underlying default geometry to show.
-- Bodygroup-sensitive wearables to a full default-hero compatibility model. This is intended to avoid the missing
-  heads/body sections produced when Dota continued applying the equipped item's bodygroup hide but
-  ignored an otherwise valid language-VPK schema overlay.
-- Alternate-style `model_player` resources to the default slot model.
-- Persona wearables to Dota's existing invisible model when they cannot attach safely to the normal hero.
-- Hero, summon, ward, transformed-unit, and other supported `entity_model`, `base_model`, and
-  `entity_clientside_model` overrides back to defaults derived from `npc_heroes.txt`,
-  `npc_units.txt`, and base items. Multi-model heroes such as Tiny expose every declared growth
-  variant (`Model` through `Model3`) to entity replacement rules.
-- `hero_model_change` and model-to-model asset replacements. Refit targets inherit an already
-  inferred hero/slot default when possible; narrowly reviewed item/path exceptions cover stale
-  schema references, and unknown rules retain the conservative original-asset fallback.
-- `additional_wearable` models to a matching default additional wearable, or to the existing invisible model when no default exists.
-- Cosmetic `pet` models and their pickup props to the existing invisible model, including all
-  Frost Avalanche wolf styles.
-- Schema `particle`, `particle_clientside`, and `particle_combined` targets to their declared default
-  particle, including transitive replacement chains.
-- Non-base `particle_create` additions in dedicated cosmetic namespaces to Dota's own neutral
-  particle, while preserving resources referenced by base items and shared hero/UI paths.
-- `particle_snapshot` targets to their declared default snapshot.
-- Global schema particle replacements to their declared defaults.
-- Cosmetic-created particles back to a matching default particle when the same item explicitly
-  suppresses that default or when its base slot declares a corresponding default effect, instead
-  of blanking the effect. This covers Ember Spirit's primary/offhand sword ambient layers.
-- Confidently matched alternate skin/material groups back to the base material, including current
-  Fall 2020/Diretide palette variants. Skin state is scoped to the item/style record that declares
-  it; a styled set piece no longer marks unrelated bundle siblings as skin-sensitive. When an
-  equipped style selects material group 1 or 2 but the visible default model only has its implicit
-  base group, the copied model receives explicit duplicate base groups instead of rendering Valve's
-  violet error material. True material-only no-ops remain conservative and reported.
+| | |
+| --- | --- |
+| **🔄 Patch-aware mappings**<br />Rebuilds from the economy and unit schemas in the currently installed game. | **📦 Self-contained releases**<br />Includes Python and both compiled-resource helpers. |
+| **🎛️ Five replacement categories**<br />Choose wearables, Personas, model swaps, attachments, and effects independently. | **🧭 Update detection**<br />Records the source Dota build and reports when an override becomes stale. |
+| **🖥️ Dashboard and CLI**<br />Use the native desktop interface or automate the same workflow from a terminal. | **🛡️ Conservative deployment**<br />Owns one checksummed VPK and never overwrites an unrelated archive. |
 
-Ambiguous mappings are skipped or resolved deterministically and written to `.work/model-plan.json`
-for review. Particle control-point and terrain-selector rules do not expose an owned resource target
-that this strategy can safely replace, so they remain reported but unchanged.
+## Requirements
 
-The 0.6 generator completed an all-category VPK build against installed Dota Steam build `24812551`
-on 2026-08-20: 9,650 model overrides and 234 locally derived English-language compatibility files
-were packed and CRC-validated with no missing required source models. The installed archive checksum
-matches its marker, and the user confirmed that the Dutch mount applies the overrides in Armory and
-Demo Hero. A representative category-by-category visual matrix is still pending.
+Packaged releases require only:
 
-The mapping baseline carried into 0.9.0-beta.1 was regenerated from installed Dota Steam build
-`24869441` on 2026-08-22 and
-passed an isolated 16,440-entry VPK pack/reopen/CRC round trip without deploying or missing a final
-source resource. It contains 10,860 model, 112 material, 5,227 particle, and 241 snapshot mappings.
-The item-scoped skin fix restores 1,147 valid default-model mappings that the previous bundle-wide
-fallback had incorrectly discarded. Five reviewed stale schema particle paths are translated to
-verified current resources; 19 explicit Valve placeholder or retired ambient-layer defaults use
-Dota's neutral particle by design, leaving zero unexpected missing default particles. Sixty-seven
-cosmetic-created particles are restored from an explicitly suppressed default, two cyclic mappings
-are skipped, 25 additive rules targeting shared paths are preserved, 253 cosmetic-created particles
-are restored from slot defaults, and 143 unsupported particle rules remain reported. This is
-structural validation; the fixes still need another in-game visual pass.
+- Windows x64, Linux x64, or macOS 15 or later on Intel or Apple Silicon.
+- A local Dota 2 installation.
 
-The same live gate verifies that every model-bearing item in the Whitewind Battlemage, Flame of
-Origin, Roost of the Winter Raven, Abominable Snowbeast, and Spirit of the Dark Wood regression
-groups still has a model mapping, with no reappearance of the discarded-model skin diagnostic.
+Linux releases target the Ubuntu 22.04 glibc baseline. macOS releases are not signed or notarized,
+and GitHub-hosted Windows releases are not code-signed.
 
-All 34 currently identified bodygroup-sensitive wearable targets now use the model-only full-hero
-fallback, and no `items_game.txt` overlay is shipped. Twelve retired schema records are ignored
-before conflict resolution, preventing the obsolete Tendrillar record from replacing Keeper of the
-Light's mount with a staff. The plan also contains 18 pet/pickup rules and 1,050 entity-default
-rules. For 1,041 skin-sensitive visible targets that can be selected with a nonzero material-group
-index, the build adds duplicate base-material groups to the copied default model and verifies that
-every non-DATA resource block is byte-identical. Intentionally invisible targets need no material
-group; only two true material-only model no-ops remain deliberately skipped. The 112 confidently
-matched material redirects handle variants that can be neutralized without model rewriting.
+## Quick start
 
-The earlier 0.5.1 loose `dota_defaultmodels` deployment generated correct files but was not loaded
-by current Dota. Version 0.6 migrates and safely removes that owned legacy output after installing
-the recognized-language VPK.
+1. Download and extract the archive for your operating system.
+2. Start `Dota2CosmeticDisabler.exe` on Windows or `./Dota2CosmeticDisabler` on Linux and macOS.
+3. Confirm the detected Dota installation and choose the cosmetic categories to replace.
+4. Keep **Dutch** selected as the compatibility mount unless you have a reason to use another
+   supported language, then select **Build Overrides**.
+5. Add the launch option shown by the application to Dota 2 in Steam:
 
-The desktop UI exposes five working categories: standard wearables, Persona models, hero and model
-swaps, standalone additional attachments, and particles/effects. The hero/model-swap category is based on
-Dota's schema mechanics (`entity_model`, `base_model`, `hero_model_change`, and model-to-model
-rules), not names or file paths. It includes many Arcana structures and some non-Arcana special
-items, but it is not a perfect "all Arcanas" filter: Arcana parts using ordinary wearable fields
-remain under standard wearables. A Persona or special item's related mappings—including its extra
-attachments—stay with the parent category to avoid applying only half of a transformation.
+   ```text
+   -language dutch
+   ```
 
-## End-user requirements
+6. Start Dota and verify the result in the Armory, Demo Hero, or a custom lobby.
 
-- Windows x64, Linux x64, or macOS 15+ on Intel or Apple Silicon.
-- An installed Dota 2 client.
+Remove the launch option to disable the generated override immediately. Use **Remove Overrides** in
+the dashboard when you also want to remove the tool-owned VPK.
 
-The packaged release includes Python plus self-contained VPK and model-skin helpers. End users do not install Python, .NET, ValvePak, ValveResourceFormat, or Source 2 Viewer separately.
+## Desktop dashboard
 
-Linux builds target Ubuntu 22.04's glibc baseline. macOS builds are not signed or notarized, and
-GitHub-hosted Windows builds are not code-signed.
+The dashboard can:
 
-## Use a packaged release
+- Detect a Dota installation or accept a manually selected path.
+- Show the installed Dota build, the build used by the current overrides, and their status.
+- Select a recognized language mount and any combination of supported categories.
+- Build and clean in the background while displaying progress.
+- Open generated reports and output folders.
+- Copy the required Steam launch option.
 
-On Windows, extract the `win-x64.zip` archive and double-click
-`Dota2CosmeticDisabler.exe`. On Linux or macOS, extract the matching `.tar.gz` archive and run
-`./Dota2CosmeticDisabler` from a terminal. With no command-line arguments, it opens a wide native
-dashboard that:
+Language and category preferences are stored locally in `.work/ui-settings.json`. Keep the
+dashboard open while a build or cleanup is running.
 
-- Auto-detects the Dota 2 installation and lets you browse when detection is unavailable.
-- Shows the installed Dota build, the build used for the existing overrides, and a clear status badge.
-- Lets you select the recognized Dota language used as the compatibility mount; Dutch is recommended.
-- Provides working toggles for the five supported model/effect categories.
-- Shows animation/audio, icons/UI, and couriers/world as disabled planned categories.
-- Builds and cleans on a background worker while streaming progress into the activity panel.
-- Opens the report/output folders and copies the required Steam launch option.
+## Supported replacements
 
-The mount-language and category selections are saved locally in `.work/ui-settings.json`. The
-selected language is recorded in the generated marker and version history, while categories are
-also recorded in the mapping report. Keep the dashboard open while a build or cleanup is running.
+| Category | Current coverage |
+| --- | --- |
+| Standard wearables | Normal and alternate-style `model_player` resources, integrated-slot items, and bodygroup-sensitive compatibility models. |
+| Persona models | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. |
+| Hero and model swaps | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, and model-to-model rules for heroes, summons, wards, transformations, and similar units. |
+| Additional attachments | `additional_wearable` resources, supported pets, and pickup props. |
+| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, and particle snapshots. |
 
-The existing CLI remains available. Open a terminal in the extracted folder and run the command
-for your platform:
+Where applicable, selected model categories also restore confidently matched material variants and
+add compatible base-material groups to copied default models.
+
+Mappings are derived from schema mechanics rather than cosmetic names. Some Arcana parts therefore
+belong to **Standard wearables**, while a transformation and its related attachments remain together
+under **Hero and model swaps** or **Persona models**.
+
+### Known limitations
+
+The tool does not currently restore:
+
+- Sounds.
+- Icons and other UI assets.
+- Hero scaling.
+- Animation or activity modifiers.
+- Control-point-only and terrain-selector particle behavior.
+- Map cosmetics, couriers, or every unusual Arcana and Persona edge case.
+
+Ambiguous mappings are resolved conservatively or skipped and recorded in
+`.work/model-plan.json` for review.
+
+## Safety and compatibility
+
+The application does not patch `dota2.exe`, inject code, modify VAC, or use `-override_vpk`. It
+copies selected resources from Dota's own VPKs into a generated archive under a recognized language
+search path. Original game files and economy schemas are not edited or repackaged, and no Valve game
+assets are distributed with this project.
+
+Generated cleanup is deliberately conservative:
+
+- The tool records ownership in its own marker and removes only the archive named by that marker.
+- It selects an available `pak90` through `pak98` slot without overwriting another mod or language
+  pack.
+- It preserves unrelated files and never recursively removes an unowned language directory.
+- It keeps the previous owned archive available until the replacement marker is safely written and
+  rolls back deployment if marker persistence fails.
+
+These boundaries do not make cosmetic overrides an officially supported Dota feature or provide an
+anti-cheat guarantee. Valve may change search-path behavior or game policy at any time. Stop using
+the generated archive if the client rejects it.
+
+## Command-line usage
+
+The packaged application opens the dashboard when started without arguments. The same executable
+also provides CLI commands:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe build
+.\Dota2CosmeticDisabler.exe status
+.\Dota2CosmeticDisabler.exe history
+.\Dota2CosmeticDisabler.exe clean
 ```
 
-```bash
-./Dota2CosmeticDisabler build
-```
+On Linux and macOS, replace `.\Dota2CosmeticDisabler.exe` with
+`./Dota2CosmeticDisabler`.
 
-The remaining command examples use the Windows filename; on Linux and macOS, replace
-`.\Dota2CosmeticDisabler.exe` with `./Dota2CosmeticDisabler`.
+### Specify the Dota installation
 
-Steam libraries are auto-detected on Windows, Linux (including Flatpak Steam), and macOS. Secondary
-libraries from `libraryfolders.vdf` are also searched. If Dota is installed somewhere unusual,
-pass its root explicitly:
+Steam libraries are auto-detected, including secondary libraries and common Flatpak Steam paths.
+Use `--dota` when automatic detection is unavailable:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe build `
   --dota "D:\SteamLibrary\steamapps\common\dota 2 beta"
 ```
 
-To build only selected categories, repeat `--category` with one or more of
-`standard_wearables`, `persona_models`, `special_models`, `additional_wearables`, and
-`particle_effects`. Omitting the flag enables every supported category. The VPK is
-replaced as one unit, so narrowing the selection cannot leave disabled-category files active.
+### Select categories
 
-The default output is:
+Omitting `--category` enables every supported category. Repeat the option to create a narrower
+build:
 
-```text
-<dota 2 beta>\game\dota_dutch\pak98_dir.vpk
+```powershell
+.\Dota2CosmeticDisabler.exe build `
+  --category standard_wearables `
+  --category particle_effects
 ```
 
-`pak98` is preferred, but the tool automatically uses the next free owned slot down to `pak90`
-without overwriting another mod or language pack.
+Available category identifiers are:
 
-The desktop selector offers every recognized compatibility mount and keeps Dutch first as the
-recommended, live-tested default. The selected name is only a mount identifier: the build derives
-matching English localization resources from the installed game so the interface stays English.
-When you rebuild after changing the selection, the tool removes only its marker-owned archive from
-the previous recognized-language mount and preserves every unrelated file.
+- `standard_wearables`
+- `persona_models`
+- `special_models`
+- `additional_wearables`
+- `particle_effects`
 
-After a successful build, add this Dota launch option in Steam:
+The generated VPK is replaced as one unit, so a later build with fewer categories cannot leave
+disabled-category resources active.
 
-```text
--language dutch
-```
+### Use another language mount
 
-Remove that launch option to disable the override immediately.
-
-For the CLI, choose a different recognized mount with `--language`, for example:
+Dutch is the recommended and live-tested default. To use another recognized mount, pass the same
+language to `build`, `status`, and `clean`, and update the Steam launch option accordingly:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe build --language finnish
 ```
 
-Then use the matching `-language finnish` Steam option. The `english` CLI alias resolves to the
-recommended `dutch` compatibility mount; arbitrary names such as `defaultmodels` are rejected.
+```text
+-language finnish
+```
 
-Every successful build records the installed Dota version. The preferred identity is Steam's
-`buildid` from `steamapps\appmanifest_570.acf`; when that metadata is unavailable, the tool records
-the size and modification time of `pak01_dir.vpk` as a fallback.
+The selected language is a compatibility mount, not the desired interface language. The build
+derives matching English localization files from the installed game so that the interface remains
+English. The `english` CLI alias resolves to the recommended Dutch mount.
 
-## Check whether Dota changed
+The default generated archive is:
 
-Run this at any time without rebuilding:
+```text
+<dota 2 beta>\game\dota_dutch\pak98_dir.vpk
+```
+
+If `pak98` is occupied, the tool selects the next available owned slot down to `pak90`.
+
+### Check for Dota updates
+
+Run `status` without rebuilding:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe status
 ```
 
-The result is:
+Possible results are:
 
-- `CURRENT` when the installed Dota version matches the version used for the generated overrides.
-- `STALE` when Dota changed after the last successful disabler build; run `build` again.
-- `UNKNOWN` for an older build that has no version record; run `build` once to add one.
-- `NOT BUILT` when no owned generated-output marker exists for that language.
-- `LEGACY` when only the obsolete loose `dota_defaultmodels` build exists; rebuild to migrate it.
-- `BROKEN` when the owned VPK is missing or its SHA-256 no longer matches the marker.
+| Status | Meaning |
+| --- | --- |
+| `CURRENT` | The installed Dota version matches the version used for the overrides. |
+| `STALE` | Dota changed after the last successful build; rebuild the overrides. |
+| `UNKNOWN` | The existing build has no comparable version record; build once to add one. |
+| `NOT BUILT` | No owned marker exists for the selected language. |
+| `LEGACY` | Only an obsolete loose-file deployment exists; rebuild to migrate it. |
+| `BROKEN` | The owned archive is missing or does not match its recorded SHA-256. |
 
-Use `--dota` and `--language` with `status` the same way as with `build`. Add `--json` for a
-machine-readable result. Status compares the installed Steam build ID (or VPK stamp fallback) and
-verifies the SHA-256 of the complete owned archive.
+Add `--json` for machine-readable status output. Successful builds are also recorded in
+`.work/dota-version-history.json`; use `history --limit 25` or `history --json` to inspect them.
 
-Successful runs are also appended to `.work\dota-version-history.json`. To show the ten most
-recent entries:
+### Rebuild or remove the override
 
-```powershell
-.\Dota2CosmeticDisabler.exe history
-```
+After a Dota update, run `build` again. The tool re-reads the installed schemas, extracts the
+required replacement resources, packs and reopens the VPK, validates every entry by CRC, and then
+replaces the previously owned archive.
 
-Use `history --limit 25`, `history --json`, or `history --work <path>` when needed. `clean` removes
-only generated Dota files and their owned marker; it intentionally retains this history.
+The build stops before deployment if Dota changes during generation or if a required model or
+snapshot source is missing. `--allow-missing` exists for investigation, but it creates a partial
+build and should not be used for normal releases.
 
-## Rebuild after a Dota update
-
-Run the same `build` command again. The current schemas and required override resources are
-re-extracted, packed, reopened, CRC-validated, and installed over the previously owned VPK with
-archive/marker rollback on persistence failure.
-
-Before rebuilding, the tool reports whether the previous disabler run used the same Dota build.
-The generator aborts before modifying the Dota directory if Dota changes while the build is
-running or if any required replacement source resources are missing. Reviewed virtual/retired
-schema particle defaults use the installed game's neutral particle and are counted separately in
-the report; an unexpected missing particle also uses neutral but emits a notice for investigation.
-Models and particle snapshots still fail closed. For investigation only, `--allow-missing` opts
-into a partial build and records the omissions in `.work/missing-resources.json`.
-
-## Remove generated files
+To remove generated files:
 
 ```powershell
 .\Dota2CosmeticDisabler.exe clean
 ```
 
-If Dota was not auto-detected during the build, pass the same `--dota` and optional `--language` values to `clean`. You can also remove the Steam launch option first; the generated files are inert unless that language path is selected.
+Use the same `--dota` and `--language` values that were used to build when automatic detection is
+not available.
 
-## Analyze extracted schemas without touching Dota
+## How it works
 
-```powershell
-.\Dota2CosmeticDisabler.exe analyze `
-  --items-game .\scripts\items\items_game.txt `
-  --npc-heroes .\scripts\npc\npc_heroes.txt `
-  --npc-units .\scripts\npc\npc_units.txt `
-  --report .\model-plan.json
-```
+1. The application reads `items_game.txt`, `npc_heroes.txt`, and `npc_units.txt` from the installed
+   Dota VPK.
+2. The planner derives default models and effects, resolves conflicts deterministically, and writes
+   a reviewable mapping report.
+3. Only required resources and English localization compatibility files are extracted.
+4. Skin-sensitive model copies receive duplicate base-material groups when a selected style index
+   would otherwise render an error material. Geometry, skeleton, animation, dependency, and other
+   opaque resource blocks remain byte-identical.
+5. The helper creates the numbered VPK, reopens every packed entry, and validates its CRC before
+   deployment.
+6. The application records the archive checksum, selected categories, mount, and Dota build in an
+   ownership marker and local history.
 
-The report defines each mapping as `source -> target`: the compiled source model, material,
-particle, or particle snapshot is copied over the target cosmetic resource path. Supplying
-`--npc-units` enables summon and ward defaults during standalone analysis.
+The VPK helper uses
+[ValvePak 4.0.0.142](https://github.com/ValveResourceFormat/ValvePak). The model material-group
+helper uses
+[ValveResourceFormat 15.0.4937](https://github.com/ValveResourceFormat/ValveResourceFormat).
+Both are bundled under the MIT License; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Internal compiled-resource helpers
+## Validation status
 
-The application extracts only explicitly requested resources from Dota's `pak01_dir.vpk`, plus the
-English localization files needed to keep the selected recognized-language mount English-compatible. Its
-narrow, path-hardened helper is backed by [ValvePak](https://github.com/ValveResourceFormat/ValvePak),
-pinned to version 4.0.0.142. The helper creates the output VPK and reopens every packed entry with
-CRC validation before deployment.
+The mapping baseline for `0.9.0-beta.1` was regenerated from installed Dota Steam build `24869441`
+on 2026-08-22. A non-deploying audit packed, reopened, and CRC-validated 16,440 entries with no
+missing final source resources:
 
-Skin-sensitive model copies are handled by a separate narrow helper backed by
-[ValveResourceFormat](https://github.com/ValveResourceFormat/ValveResourceFormat) 15.0.4937. It
-changes only the model's material-group KV3 data, reparses the result, and rejects the output unless
-all non-DATA compiled blocks remain byte-identical. ValvePak and ValveResourceFormat are included
-under the MIT license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No Valve game assets are distributed with this project or its release package.
+| Resource type | Mappings |
+| --- | ---: |
+| Models | 10,860 |
+| Materials | 112 |
+| Particles | 5,227 |
+| Particle snapshots | 241 |
 
-## Development from source
+An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
+recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
+`0.9.0-beta.1` mapping and skin-material changes have structural coverage but still require another
+representative in-game visual pass. These results must not be interpreted as proof that every
+cosmetic works with the current live game.
 
-Maintained Python code lives in the layered `dota_disabler` package. Schema parsing, planning rules,
-conflict resolution, resource-aware fallbacks, VPK operations, deployment/version history,
-application services, CLI, and GUI adapters have separate modules. `disable_cosmetics.py` and
-`disabler_gui.py` are compatibility launchers only; architecture tests keep maintained behavior
-from drifting back into them or creating adapter-to-core dependency cycles.
+## Development
 
-Source development requires Python 3.10+, the .NET 8 SDK for the VPK helper, and the .NET 9 SDK for
-the model-skin helper. Build both helpers, then run the tests:
+Source development requires:
+
+- Python 3.10 or later with Tcl/Tk.
+- .NET 8 SDK for `tools/VpkExtractor`.
+- .NET 9 SDK for `tools/ModelPatcher`.
+
+Build both helpers and run the source suite:
 
 ```powershell
 dotnet build .\tools\VpkExtractor\VpkExtractor.csproj --configuration Release
@@ -303,91 +313,60 @@ dotnet build .\tools\ModelPatcher\ModelPatcher.csproj --configuration Release
 python -m unittest discover -s tests -v
 ```
 
-The Python source automatically locates the Release-mode extractor. Run without arguments for the
-desktop dashboard, or use an explicit CLI command:
+Run the application from source:
 
 ```powershell
 python .\disable_cosmetics.py
 python .\disable_cosmetics.py build
 ```
 
-The source tests cover package boundaries and compatibility facades, deterministic conflicts,
-item-scoped skin regressions, KeyValues parsing, Dota version comparison and history, schema-driven
-category selection, particle defaults/suppression/chains, UI settings/view state, path traversal
-rejection, manifest-owned deployment and rollback, unowned-target protection, conservative cleanup, and real
-VPK extraction against a generated fixture. The release workflow additionally runs the hidden-window
-GUI smoke test and the packaged end-to-end test. A Dota installation is still required for a full
-live build because Valve schemas and compiled override resources are not committed here.
+Analyze already extracted schemas without reading or modifying a Dota installation:
 
-Maintainers can run the non-deploying current-install gate on a drive with several GB free:
+```powershell
+python .\disable_cosmetics.py analyze `
+  --items-game .\scripts\items\items_game.txt `
+  --npc-heroes .\scripts\npc\npc_heroes.txt `
+  --npc-units .\scripts\npc\npc_units.txt `
+  --report .\model-plan.json
+```
+
+Run the non-deploying current-install gate on a system with several gigabytes of free space:
 
 ```powershell
 python .\scripts\audit_live_install.py --pack --temp-root .\.work
 ```
 
-It uses an automatically removed temporary directory, verifies every final mapping source, and
-packs/reopens the complete temporary VPK with CRC validation without writing under the Dota folder.
+The audit extracts every final source into a temporary directory and packs and reopens the complete
+VPK without writing under the Dota installation.
 
-## Build the self-contained release
+### Build a self-contained release
 
-Install the pinned build-only packager, then run the release script:
+Install the pinned build dependency and run the release script:
 
 ```powershell
 python -m pip install -r .\requirements-build.txt
 .\scripts\build_release.ps1 -Python python
 ```
 
-On Linux or macOS, run the same cross-platform PowerShell script with `pwsh`, for example:
+On Linux or macOS:
 
 ```bash
 python3 -m pip install -r ./requirements-build.txt
 pwsh ./scripts/build_release.ps1 -Python python3
 ```
 
-The script verifies Tcl/Tk, publishes both self-contained .NET helpers, runs the source tests, embeds
-the helpers into a native single-file application, and runs both the packaged GUI smoke test and
-the isolated synthetic packaged build/status/history/clean lifecycle. It then writes the executable
-checksum, creates a platform-labelled archive, and writes an adjacent SHA-256 file. Windows uses
-`.zip`; Linux and macOS use `.tar.gz` so executable permissions survive extraction. The runtime is
-selected automatically from the host, or can be supplied explicitly as `win-x64`, `linux-x64`,
-`osx-x64`, or `osx-arm64`. Each target must be built on its native operating system.
+Each target is built on its native operating system. The script publishes both .NET helpers, runs
+the source tests, creates the single-file application, performs packaged GUI and end-to-end smoke
+tests, and writes a platform-labelled archive with an adjacent SHA-256 file.
 
-## Automated tests and cross-platform builds
-
-GitHub Actions builds both compiled-resource helpers and runs the Python source suite on Windows,
-Linux, and macOS for every push to `main` and every pull request. The release workflow can be
-started manually and runs automatically for future `v*` tags. Native runners build `win-x64`,
-`linux-x64`, `osx-x64`, and `osx-arm64` independently with the same `build_release.ps1` gate,
-including the packaged GUI and end-to-end smoke tests. Manual runs retain each verified archive and
-its SHA-256 file as a temporary workflow artifact for 30 days.
-
-A version tag must exactly match `dota_disabler/version.py`. After every native tag build passes,
-the workflow validates all four archive checksums and creates a draft GitHub Release containing the
-four archives and their adjacent SHA-256 files. SemVer prerelease tags such as
-`v0.9.0-beta.1` are marked as prereleases. Rerunning a tag can refresh its draft assets, but the
-workflow refuses to overwrite an already-published release. A maintainer reviews the generated
-notes and assets before publishing the draft. GitHub-hosted archives remain unsigned builds.
-
-## Why the recognized-language VPK path is expected to work
-
-Dota's current `gameinfo.gi` mounts `dota_*LANGUAGE*` ahead of the normal `dota` game path. Current
-maintained mod tooling uses a recognized language name and numbered VPK rather than an arbitrary
-loose-file language folder. This project defaults English users to the recognized but otherwise
-unused `dutch` mount by default, lets users choose another recognized mount, and derives matching
-English localization resources from their own installed Dota data. Compiled particle, snapshot,
-material, and ordinary model resources are copied unchanged. Selected skin-sensitive `.vmdl_c`
-copies have only their material-group KV3 data reserialized; geometry and every other compiled block
-are preserved byte-for-byte.
-
-- [Tracked Dota `gameinfo.gi`](https://github.com/SteamDatabase/GameTracking-Dota2/blob/master/game/dota/gameinfo.gi)
-- [ValvePak VPK library](https://github.com/ValveResourceFormat/ValvePak)
-- [ValveResourceFormat Source 2 resource library](https://github.com/ValveResourceFormat/ValveResourceFormat)
+GitHub Actions runs the helper builds and Python tests on Windows, Linux, and macOS. Version tags
+must match `dota_disabler/version.py`; successful `v*` tag builds produce a draft release for
+`win-x64`, `linux-x64`, `osx-x64`, and `osx-arm64`.
 
 ## License and affiliation
 
-The project source is available under the [MIT License](LICENSE). Bundled dependencies retain their
-own licenses as recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Project source is available under the [MIT License](LICENSE). Bundled dependencies retain their own
+licenses as listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-This project is not affiliated with, endorsed by, or supported by Valve Corporation. Dota and Dota 2
-are trademarks of Valve Corporation. No Valve game assets are distributed by this repository or in
-its release packages.
+This project is not affiliated with, endorsed by, or supported by Valve Corporation. Dota and
+Dota 2 are trademarks of Valve Corporation.

@@ -164,6 +164,10 @@ try {
     foreach ($document in ("README.md", "THIRD_PARTY_NOTICES.md")) {
         Copy-Item -LiteralPath $document -Destination $releaseDirectory
     }
+    $readmeImageSource = Join-Path $projectRoot "docs/images/dashboard.png"
+    $readmeImageDirectory = Join-Path $releaseDirectory "docs/images"
+    New-Item -ItemType Directory -Path $readmeImageDirectory -Force | Out-Null
+    Copy-Item -LiteralPath $readmeImageSource -Destination $readmeImageDirectory
 
     $releaseBinary = Join-Path $releaseDirectory $applicationFilename
     if (-not $onWindows) {
