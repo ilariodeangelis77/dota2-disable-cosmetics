@@ -564,17 +564,31 @@ class DisablerApp:
         self.open_report_button = FlatButton(
             activity_header, text="Open report", command=self._open_report, compact=True
         )
-        self.open_report_button.grid(row=0, column=1, padx=(8, 0))
+        self.progress_label = tk.Label(
+            activity_header,
+            text="",
+            bg=SURFACE,
+            fg=TEXT_SOFT,
+            font=("Segoe UI Semibold", 9),
+        )
+        self.progress_label.grid(row=0, column=1, padx=(8, 4))
+        self.open_report_button.grid(row=0, column=2, padx=(8, 0))
         self.open_output_button = FlatButton(
             activity_header, text="Open output", command=self._open_output, compact=True
         )
-        self.open_output_button.grid(row=0, column=2, padx=(8, 0))
+        self.open_output_button.grid(row=0, column=3, padx=(8, 0))
         self.copy_launch_button = FlatButton(
             activity_header, text="Copy launch option", command=self._copy_launch_option, compact=True
         )
-        self.copy_launch_button.grid(row=0, column=3, padx=(8, 0))
+        self.copy_launch_button.grid(row=0, column=4, padx=(8, 0))
 
-        self.progress = ttk.Progressbar(panel, mode="indeterminate", style="Dota.Horizontal.TProgressbar")
+        self.progress = ttk.Progressbar(
+            panel,
+            mode="determinate",
+            maximum=100,
+            value=0,
+            style="Dota.Horizontal.TProgressbar",
+        )
         self.progress.grid(row=1, column=0, sticky="ew", padx=16)
 
         self.log = tk.Text(
@@ -725,6 +739,9 @@ class DisablerApp:
             result = engine.build_cosmetics(
                 options,
                 progress=lambda message: self.events.put(("log", message, False)),
+                progress_update=lambda percent, message: self.events.put(
+                    ("progress", percent, message)
+                ),
                 warning=lambda message: self.events.put(("log", message, True)),
             )
             status, error = try_get_status(result.dota, language)
@@ -768,6 +785,7 @@ class DisablerApp:
             except Exception as exc:  # marshalled to the Tk thread below
                 self.events.put(("error", kind, exc))
             else:
+                self.events.put(("progress", 95, "Finalizing operation"))
                 self.events.put(("success", kind, result))
 
         threading.Thread(target=worker, name=f"disabler-{kind}", daemon=True).start()
@@ -779,7 +797,10 @@ class DisablerApp:
                 try:
                     if event[0] == "log":
                         self._append_log(str(event[1]), error=bool(event[2]))
+                    elif event[0] == "progress":
+                        self._set_progress(int(event[1]), str(event[2]))
                     elif event[0] == "success":
+                        self._set_progress(100, "Operation complete")
                         self._worker_succeeded(event[1], event[2])
                     elif event[0] == "error":
                         self._worker_failed(event[1], event[2])
@@ -878,10 +899,20 @@ class DisablerApp:
             toggle.set_enabled(not busy)
         if busy:
             self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
-            self.progress.start(10)
+            self.progress.configure(value=1)
+            self.progress_label.configure(text="1%")
         else:
             self.activity_title.configure(text="ACTIVITY", fg=MUTED)
-            self.progress.stop()
+
+    def _set_progress(self, percent: int, message: str = "") -> None:
+        percent = max(0, min(100, percent))
+        current = int(float(self.progress["value"]))
+        if self.busy and percent < current:
+            return
+        self.progress.configure(value=percent)
+        self.progress_label.configure(text=f"{percent}%")
+        if self.busy and message:
+            self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
 
     def _apply_status(self, result: dict) -> None:
         self.last_status = result

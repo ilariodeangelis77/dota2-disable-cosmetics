@@ -24,7 +24,7 @@ from .constants import (
     VPK_ARCHIVE_CANDIDATES,
     VPK_DEPLOYMENT_MODE,
 )
-from .domain import CleanResult, Plan, ProgressCallback
+from .domain import CleanResult, Plan, ProgressCallback, ProgressUpdateCallback
 from .errors import GeneratorError, UnsafeOutputError
 from .model_patcher import patch_model_material_groups_batch
 from .paths import path_under
@@ -220,6 +220,7 @@ def deploy_overrides(
     generated_at_utc: Optional[str] = None,
     enabled_categories: Optional[Iterable[str]] = None,
     progress: ProgressCallback = print,
+    progress_update: Optional[ProgressUpdateCallback] = None,
 ) -> tuple[int, list[dict]]:
     # ``items_schema`` remains in the API for compatibility with pre-0.7 callers;
     # current Dota ignores a recognized-language economy-schema overlay.
@@ -233,6 +234,12 @@ def deploy_overrides(
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
+
+    def report_progress(percent: int, message: str) -> None:
+        if progress_update is not None:
+            progress_update(max(0, min(100, percent)), message)
+
+    report_progress(0, "Preparing override files")
 
     skin_patch_mappings = [
         mapping
@@ -248,7 +255,9 @@ def deploy_overrides(
     missing: list[dict] = []
     staged_files: list[str] = []
     patch_jobs: list[tuple[Path, Path, int]] = []
-    for mapping in plan.mappings:
+    mapping_count = len(plan.mappings)
+    last_staging_percent = -1
+    for index, mapping in enumerate(plan.mappings, start=1):
         source_relative = compiled_override_path(mapping.source, mapping.resource_type)
         target_relative = compiled_override_path(mapping.target, mapping.resource_type)
         source = path_under(cache, source_relative)
@@ -270,6 +279,15 @@ def deploy_overrides(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         staged_files.append(target_relative)
+        staging_percent = round(index * 50 / mapping_count) if mapping_count else 50
+        if staging_percent > last_staging_percent:
+            report_progress(
+                staging_percent,
+                f"Staging overrides ({index:,} of {mapping_count:,})",
+            )
+            last_staging_percent = staging_percent
+
+    report_progress(50, f"Staged {len(staged_files):,} override resource(s)")
 
     missing_path = work / "missing-resources.json"
     legacy_missing_path = work / "missing-models.json"
@@ -287,13 +305,16 @@ def deploy_overrides(
         missing_path.unlink()
 
     if patch_jobs:
+        report_progress(52, "Patching skin-sensitive default models")
         patch_model_material_groups_batch(
             model_patcher,
             patch_jobs,
             staging,
             progress=progress,
         )
+    report_progress(67, "Default model preparation complete")
 
+    report_progress(68, "Adding English interface resources")
     support_resources = (
         stage_english_language_support(
             extractor,
@@ -306,6 +327,7 @@ def deploy_overrides(
         if game_pak is not None
         else []
     )
+    report_progress(75, "Language compatibility resources ready")
     # Current Dota loads the economy schema before recognized-language VPK
     # overrides are considered. A structurally valid items_game.txt overlay was
     # therefore ignored in live testing. Bodygroup-sensitive wearables now use
@@ -332,7 +354,9 @@ def deploy_overrides(
         shutil.rmtree(package_root)
     package_root.mkdir(parents=True)
     staged_archive = package_root / archive_name
+    report_progress(78, "Packing and CRC-validating the override VPK")
     packed = pack_vpk(extractor, staging, staged_archive, progress=progress)
+    report_progress(92, "Override VPK packed and validated")
     unique_resources = sorted(set(staged_files))
     if packed != len(unique_resources) + len(support_resources) + len(schema_resources):
         raise GeneratorError("The VPK resource count does not match the staged override count.")
@@ -364,6 +388,7 @@ def deploy_overrides(
     if archive_destination.is_file():
         os.replace(archive_destination, rollback_destination)
 
+    report_progress(95, "Installing the validated override VPK")
     committed = False
     try:
         for target, rollback in obsolete_rollbacks:
@@ -390,6 +415,7 @@ def deploy_overrides(
             },
         )
         committed = True
+        report_progress(100, "Override VPK installed")
     except Exception:
         try:
             if archive_destination.is_file():

@@ -1554,6 +1554,7 @@ class DeploymentTests(unittest.TestCase):
             official = output / "pak01_dir.vpk"
             official.write_bytes(b"unowned language pack")
 
+            progress_updates = []
             copied, missing = generator.deploy_overrides(
                 self.make_plan(),
                 cache,
@@ -1563,9 +1564,16 @@ class DeploymentTests(unittest.TestCase):
                 clean_first=True,
                 allow_missing=False,
                 language="dutch",
+                progress_update=lambda percent, message: progress_updates.append(
+                    (percent, message)
+                ),
             )
             self.assertEqual(copied, 1)
             self.assertEqual(missing, [])
+            percentages = [value for value, _message in progress_updates]
+            self.assertEqual(percentages, sorted(percentages))
+            self.assertEqual(percentages[0], 0)
+            self.assertEqual(percentages[-1], 100)
             marker = json.loads((output / generator.MARKER_FILENAME).read_text(encoding="utf-8"))
             self.assertEqual(marker["deployment_mode"], generator.VPK_DEPLOYMENT_MODE)
             self.assertEqual(marker["files"], ["pak98_dir.vpk"])

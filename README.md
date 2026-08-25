@@ -111,7 +111,8 @@ The dashboard can:
 - Detect a Dota installation or accept a manually selected path.
 - Show the installed Dota build, the build used by the current overrides, and their status.
 - Select a recognized language mount and any combination of supported categories.
-- Build and clean in the background while displaying progress.
+- Build and clean in the background while displaying real stage and per-file progress on a
+  determinate bar.
 - Open generated reports and output folders.
 - Copy the required Steam launch option.
 

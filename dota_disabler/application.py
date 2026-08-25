@@ -26,7 +26,13 @@ from .deployment import (
     validate_category_transition,
     validate_language,
 )
-from .domain import BuildOptions, BuildResult, Plan, ProgressCallback
+from .domain import (
+    BuildOptions,
+    BuildResult,
+    Plan,
+    ProgressCallback,
+    ProgressUpdateCallback,
+)
 from .errors import GeneratorError
 from .model_patcher import find_model_patcher, validate_model_patcher
 from .paths import application_root
@@ -120,9 +126,15 @@ def _build_cosmetics_unlocked(
     options: BuildOptions,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[ProgressUpdateCallback] = None,
     warning: Optional[ProgressCallback] = None,
     resolved_dota: Optional[Path] = None,
 ) -> BuildResult:
+    def report_progress(percent: int, message: str) -> None:
+        if progress_update is not None:
+            progress_update(max(0, min(100, percent)), message)
+
+    report_progress(1, "Validating the Dota installation")
     warning = warning or progress
     enabled_categories = frozenset(options.enabled_categories)
     if not enabled_categories:
@@ -161,6 +173,7 @@ def _build_cosmetics_unlocked(
         enabled_categories,
         clean_first=options.clean_first,
     )
+    report_progress(8, "Dota installation and previous build validated")
 
     progress(f"Dota: {dota}")
     progress(f"Current Dota version: {dota_version_label(current_version)}")
@@ -188,12 +201,15 @@ def _build_cosmetics_unlocked(
     progress(f"VPK extractor: {extractor}")
     progress(f"Enabled categories: {', '.join(sorted(enabled_categories))}")
 
+    report_progress(10, "Extracting the current Dota schemas")
     items_path, heroes_path, units_path = load_or_extract_schema(
         dota,
         extractor,
         cache,
         progress=progress,
     )
+    report_progress(20, "Current Dota schemas extracted")
+    report_progress(22, "Planning cosmetic replacements")
     plan = parse_schemas(
         items_path,
         heroes_path,
@@ -204,6 +220,7 @@ def _build_cosmetics_unlocked(
     # Persist the schema-only plan even when a later extraction or deployment
     # validation fails.
     write_plan(plan, report, enabled_categories=enabled_categories)
+    report_progress(32, f"Planned {len(plan.mappings):,} replacement mapping(s)")
 
     source_resources = {
         compiled_override_path(mapping.source, mapping.resource_type)
@@ -215,6 +232,7 @@ def _build_cosmetics_unlocked(
     progress(
         f"Extracting {len(sorted_source_resources)} unique replacement resource(s)..."
     )
+    report_progress(35, "Extracting replacement resources from Dota")
     extract_vpk(
         extractor,
         pak,
@@ -222,7 +240,9 @@ def _build_cosmetics_unlocked(
         cache,
         progress=progress,
     )
+    report_progress(55, "Replacement resources extracted")
 
+    report_progress(57, "Checking default-model material groups")
     plan = apply_model_skin_material_fallbacks(plan, cache)
     group_patch_targets = sum(
         mapping.resource_type == RESOURCE_MODEL
@@ -262,7 +282,9 @@ def _build_cosmetics_unlocked(
             cache,
             progress=progress,
         )
+    report_progress(65, "Model and material resources prepared")
 
+    report_progress(67, "Validating particle fallbacks and Dota version")
     plan = apply_missing_particle_fallbacks(plan, cache)
     unknown_particle_fallbacks = plan.stats.get(
         "particle_unknown_defaults_neutralized",
@@ -284,6 +306,13 @@ def _build_cosmetics_unlocked(
         )
     current_version = latest_version
     built_at_utc = datetime.now(timezone.utc).isoformat()
+
+    def deployment_progress(percent: int, message: str) -> None:
+        # Deployment owns the final 30% of a build. Its callback reports
+        # concrete staging, patching, packing, validation, and install work.
+        report_progress(70 + round(percent * 29 / 100), message)
+
+    report_progress(70, "Preparing the deployable override archive")
     copied, missing = deploy_overrides(
         plan,
         cache,
@@ -300,6 +329,7 @@ def _build_cosmetics_unlocked(
         generated_at_utc=built_at_utc,
         enabled_categories=enabled_categories,
         progress=progress,
+        progress_update=deployment_progress,
     )
     clean_legacy_output_after_migration(
         dota,
@@ -332,6 +362,7 @@ def _build_cosmetics_unlocked(
         },
         warning=warning,
     )
+    report_progress(100, "Build complete")
 
     progress("")
     progress(
@@ -372,6 +403,7 @@ def build_cosmetics(
     options: BuildOptions,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[ProgressUpdateCallback] = None,
     warning: Optional[ProgressCallback] = None,
 ) -> BuildResult:
     dota = find_dota_install(options.dota)
@@ -379,6 +411,7 @@ def build_cosmetics(
         return _build_cosmetics_unlocked(
             options,
             progress=progress,
+            progress_update=progress_update,
             warning=warning,
             resolved_dota=dota,
         )

@@ -14,6 +14,7 @@ from .domain import (
     Mapping,
     Plan,
     ProgressCallback,
+    ProgressUpdateCallback,
 )
 from .errors import GeneratorError, UnsafeOutputError
 from .keyvalues import (
@@ -66,6 +67,7 @@ __all__ = [
     "Mapping",
     "Plan",
     "ProgressCallback",
+    "ProgressUpdateCallback",
     "TokenStream",
     "UnsafeOutputError",
     "application_root",

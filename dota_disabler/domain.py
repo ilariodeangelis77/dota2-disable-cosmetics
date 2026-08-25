@@ -15,6 +15,7 @@ from .constants import (
 
 
 ProgressCallback = Callable[[str], None]
+ProgressUpdateCallback = Callable[[int, str], None]
 
 
 @dataclass
@@ -97,4 +98,5 @@ __all__ = [
     "Mapping",
     "Plan",
     "ProgressCallback",
+    "ProgressUpdateCallback",
 ]

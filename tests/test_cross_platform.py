@@ -47,6 +47,14 @@ class SteamDiscoveryContractTests(unittest.TestCase):
 
 
 class ReleaseWorkflowContractTests(unittest.TestCase):
+    def test_desktop_progress_bar_uses_determinate_build_updates(self):
+        gui = (PROJECT_ROOT / "dota_disabler/gui.py").read_text(encoding="utf-8")
+
+        self.assertIn('mode="determinate"', gui)
+        self.assertIn("progress_update=lambda percent, message", gui)
+        self.assertNotIn("self.progress.start(", gui)
+        self.assertNotIn("self.progress.stop(", gui)
+
     def test_native_release_matrix_and_archive_formats_are_kept(self):
         workflow = (PROJECT_ROOT / ".github/workflows/build-releases.yml").read_text(
             encoding="utf-8"
