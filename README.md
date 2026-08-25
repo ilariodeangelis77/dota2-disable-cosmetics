@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><strong>Releases</strong></a>
+  · <a href="#why-use-it">Why use it?</a>
   · <a href="#quick-start">Quick start</a>
   · <a href="#supported-replacements">Features</a>
   · <a href="#command-line-usage">CLI</a>
@@ -41,6 +42,31 @@ Dota 2 Cosmetic Disabler is a self-contained desktop and command-line tool that 
 equipped cosmetic models and effects to their default Dota 2 resources. It generates replacements
 from the user's installed game data, allowing the mapping to be rebuilt after Dota updates instead
 of relying on a static cosmetic list.
+
+## Why use it?
+
+> **Read the hero before the cosmetic.**
+
+Valve's official
+[Dota 2 Workshop Character Art Guide](https://help.steampowered.com/en/faqs/view/0688-7692-4D5A-1935)
+describes a visual language designed to keep every hero immediately identifiable from above during
+gameplay. It emphasizes recognizable silhouettes, deliberate color and value contrast, areas of
+visual rest, and details that remain readable at game-view distance. The guide even gives the
+in-game view higher priority than the loadout presentation.
+
+The guide allows cosmetics to depart from default silhouettes and colors, provided that they
+preserve identification and gameplay readability. As Dota's cosmetic catalogue has expanded,
+however, some players find elaborate sets, recolors, Personas, Arcanas, model swaps, and particle
+effects harder to parse quickly than the original hero designs. This tool provides a client-side
+way to return supported assets to that more familiar visual language.
+
+- **Faster recognition:** Keep hero silhouettes and facing cues closer to their defaults.
+- **Familiar color hierarchy:** Return supported models and materials to established hero palettes
+  and values.
+- **Less visual noise:** Replace supported cosmetic particles and attachments with their defaults or
+  safe neutral fallbacks.
+- **Better performance:** Improve framerate by reducing supported cosmetic effects and complex
+  alternate assets.
 
 ## Highlights
 
