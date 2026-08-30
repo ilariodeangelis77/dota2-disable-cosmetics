@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0 beta 1" src="https://img.shields.io/badge/version-0.9.0--beta.1-E85D4A?style=for-the-badge" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0 beta 2" src="https://img.shields.io/badge/version-0.9.0--beta.2-E85D4A?style=for-the-badge" /></a>
   <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=for-the-badge" />
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;color=2EA043" /></a>
 </p>
@@ -31,7 +31,7 @@
   <img src="docs/images/dashboard.png" alt="Dota 2 Cosmetic Disabler desktop dashboard" width="100%" />
 </p>
 
-<p align="center"><sub>The 0.9.0-beta.1 dashboard showing installation detection, category selection, and Dota build status.</sub></p>
+<p align="center"><sub>The dashboard showing installation detection, category selection, and Dota build status.</sub></p>
 
 > [!IMPORTANT]
 > This project is in beta. It has passed automated, packaged, and live-install schema validation,
@@ -307,8 +307,8 @@ Both are bundled under the MIT License; see
 
 ## Validation status
 
-The mapping baseline for `0.9.0-beta.1` was regenerated from installed Dota Steam build `24869441`
-on 2026-08-22. A non-deploying audit packed, reopened, and CRC-validated 16,440 entries with no
+The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25002408`
+on 2026-08-30. A non-deploying audit packed, reopened, and CRC-validated 16,440 entries with no
 missing final source resources:
 
 | Resource type | Mappings |
@@ -320,9 +320,9 @@ missing final source resources:
 
 An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
 recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
-`0.9.0-beta.1` mapping and skin-material changes have structural coverage but still require another
-representative in-game visual pass. These results must not be interpreted as proof that every
-cosmetic works with the current live game.
+`0.9.0-beta.2` mapping, skin-material, and desktop progress changes have structural coverage but
+still require another representative in-game visual pass. These results must not be interpreted as
+proof that every cosmetic works with the current live game.
 
 ## Development
 
