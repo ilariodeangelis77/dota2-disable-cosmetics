@@ -52,6 +52,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
 
         self.assertIn('mode="determinate"', gui)
         self.assertIn("progress_update=lambda percent, message", gui)
+        self.assertIn('f"{percent:.1f}%"', gui)
         self.assertNotIn("self.progress.start(", gui)
         self.assertNotIn("self.progress.stop(", gui)
 

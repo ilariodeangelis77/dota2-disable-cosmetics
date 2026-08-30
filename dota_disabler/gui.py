@@ -798,7 +798,7 @@ class DisablerApp:
                     if event[0] == "log":
                         self._append_log(str(event[1]), error=bool(event[2]))
                     elif event[0] == "progress":
-                        self._set_progress(int(event[1]), str(event[2]))
+                        self._set_progress(float(event[1]), str(event[2]))
                     elif event[0] == "success":
                         self._set_progress(100, "Operation complete")
                         self._worker_succeeded(event[1], event[2])
@@ -899,18 +899,19 @@ class DisablerApp:
             toggle.set_enabled(not busy)
         if busy:
             self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
-            self.progress.configure(value=1)
-            self.progress_label.configure(text="1%")
+            self.progress.configure(value=0.0)
+            self.progress_label.configure(text="0.0%")
         else:
             self.activity_title.configure(text="ACTIVITY", fg=MUTED)
 
-    def _set_progress(self, percent: int, message: str = "") -> None:
-        percent = max(0, min(100, percent))
-        current = int(float(self.progress["value"]))
+    def _set_progress(self, percent: float, message: str = "") -> None:
+        percent = max(0.0, min(100.0, percent))
+        current = float(self.progress["value"])
         if self.busy and percent < current:
             return
         self.progress.configure(value=percent)
-        self.progress_label.configure(text=f"{percent}%")
+        label = "100%" if percent >= 100.0 else f"{percent:.1f}%"
+        self.progress_label.configure(text=label)
         if self.busy and message:
             self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
 

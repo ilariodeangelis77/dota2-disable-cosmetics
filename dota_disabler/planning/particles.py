@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import Optional
 
 from ..constants import (
     INTENTIONALLY_NEUTRAL_PARTICLE_DEFAULTS,
@@ -11,12 +12,17 @@ from ..constants import (
     NEUTRAL_PARTICLE,
     RESOURCE_PARTICLE,
 )
-from ..domain import Mapping, Plan
+from ..domain import Mapping, Plan, WorkProgressCallback
 from ..paths import path_under
 from ..resources import canonical, compiled_override_path, compiled_particle_path
 
 
-def apply_missing_particle_fallbacks(plan: Plan, cache: Path) -> Plan:
+def apply_missing_particle_fallbacks(
+    plan: Plan,
+    cache: Path,
+    *,
+    work_progress: Optional[WorkProgressCallback] = None,
+) -> Plan:
     """Use Dota's null particle when a schema-referenced default no longer exists."""
 
     neutral_compiled = compiled_particle_path(NEUTRAL_PARTICLE)
@@ -28,7 +34,8 @@ def apply_missing_particle_fallbacks(plan: Plan, cache: Path) -> Plan:
     fallback_count = 0
     intentional_count = 0
     unknown_count = 0
-    for mapping in plan.mappings:
+    mapping_count = len(plan.mappings)
+    for index, mapping in enumerate(plan.mappings, start=1):
         source_relative = compiled_override_path(mapping.source, mapping.resource_type)
         if (
             mapping.resource_type == RESOURCE_PARTICLE
@@ -56,6 +63,8 @@ def apply_missing_particle_fallbacks(plan: Plan, cache: Path) -> Plan:
                 unknown_count += 1
         else:
             adjusted.append(mapping)
+        if work_progress is not None:
+            work_progress("validate", index, mapping_count)
 
     if not fallback_count:
         return plan

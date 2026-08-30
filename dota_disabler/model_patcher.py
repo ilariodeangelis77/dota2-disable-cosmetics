@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
-from .domain import ProgressCallback
+from .domain import ProgressCallback, WorkProgressCallback
 from .errors import GeneratorError
 from .paths import runtime_asset_root, source_root
 from .vpk import run
@@ -108,6 +108,7 @@ def patch_model_material_groups_batch(
     manifest_directory: Path,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
 ) -> None:
     jobs = list(requests)
     if not jobs:
@@ -135,9 +136,13 @@ def patch_model_material_groups_batch(
                 manifest.write(f"{source}\t{destination}\t{required_groups}\n")
             manifest_path = Path(manifest.name)
         progress(f"Adding default material groups to {len(jobs)} skin-sensitive model(s)...")
+        command = [str(patcher), "patch-batch", "--manifest", str(manifest_path)]
+        if progress_update is not None:
+            command.append("--progress")
         process = run(
-            [str(patcher), "patch-batch", "--manifest", str(manifest_path)],
+            command,
             quiet=True,
+            progress_update=progress_update,
         )
         try:
             lines = (process.stdout or "").splitlines()

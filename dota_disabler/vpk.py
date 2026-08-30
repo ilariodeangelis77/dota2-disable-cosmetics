@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, Optional
 
-from .domain import ProgressCallback
+from .domain import ProgressCallback, WorkProgressCallback
 from .errors import GeneratorError
 from .paths import path_under, runtime_asset_root, source_root
 from .resources import canonical, compiled_override_path, is_safe_resource_path
@@ -56,16 +56,66 @@ def run(
     *,
     quiet: bool = False,
     progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
 ) -> subprocess.CompletedProcess[str]:
     if not quiet:
         progress(f"+ {subprocess.list2cmdline(command)}")
-    process = subprocess.run(
-        command,
-        stdout=subprocess.PIPE if quiet else None,
-        stderr=subprocess.PIPE if quiet else None,
-        text=True,
-        check=False,
-    )
+    if progress_update is None:
+        process = subprocess.run(
+            command,
+            stdout=subprocess.PIPE if quiet else None,
+            stderr=subprocess.PIPE if quiet else None,
+            text=True,
+            check=False,
+        )
+    else:
+        output_lines: list[str] = []
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as error_stream:
+            with subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=error_stream,
+                text=True,
+            ) as child:
+                assert child.stdout is not None
+                for line in child.stdout:
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        output_lines.append(line)
+                        continue
+                    update = record.get("progress") if isinstance(record, dict) else None
+                    if update is None:
+                        output_lines.append(line)
+                        continue
+                    try:
+                        phase = update["phase"]
+                        completed = int(update["completed"])
+                        total = int(update["total"])
+                        if (
+                            not isinstance(phase, str)
+                            or not phase
+                            or completed < 0
+                            or total < 1
+                            or completed > total
+                        ):
+                            raise ValueError
+                    except (KeyError, TypeError, ValueError) as exc:
+                        child.kill()
+                        child.wait()
+                        raise GeneratorError(
+                            "A compiled-resource helper returned an invalid progress update."
+                        ) from exc
+                    progress_update(phase, completed, total)
+                returncode = child.wait()
+            error_stream.seek(0)
+            stderr = error_stream.read()
+        process = subprocess.CompletedProcess(
+            command,
+            returncode,
+            stdout="".join(output_lines),
+            stderr=stderr,
+        )
     if process.returncode != 0:
         detail = ""
         if quiet:
@@ -87,6 +137,7 @@ def extract_vpk(
     output: Path,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
 ) -> None:
     output.mkdir(parents=True, exist_ok=True)
     paths = sorted({canonical(path) for path in resource_paths})
@@ -116,17 +167,21 @@ def extract_vpk(
             manifest.write("\n".join(paths) + "\n")
             manifest_path = Path(manifest.name)
         progress(f"Extracting {len(paths)} resource(s) from Dota's VPK...")
+        command = [
+            str(extractor),
+            "--vpk",
+            str(pak),
+            "--output",
+            str(output),
+            "--paths-file",
+            str(manifest_path),
+        ]
+        if progress_update is not None:
+            command.append("--progress")
         process = run(
-            [
-                str(extractor),
-                "--vpk",
-                str(pak),
-                "--output",
-                str(output),
-                "--paths-file",
-                str(manifest_path),
-            ],
+            command,
             quiet=True,
+            progress_update=progress_update,
         )
         try:
             result = json.loads(process.stdout or "")
@@ -153,6 +208,7 @@ def pack_vpk(
     output_path: Path,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
 ) -> int:
     resources = sorted(
         canonical(path.relative_to(input_root).as_posix())
@@ -174,16 +230,20 @@ def pack_vpk(
     if output_path.is_file():
         output_path.unlink()
     progress(f"Packing and CRC-validating {len(resources)} resource(s)...")
+    command = [
+        str(extractor),
+        "pack",
+        "--input",
+        str(input_root),
+        "--output",
+        str(output_path),
+    ]
+    if progress_update is not None:
+        command.append("--progress")
     process = run(
-        [
-            str(extractor),
-            "pack",
-            "--input",
-            str(input_root),
-            "--output",
-            str(output_path),
-        ],
+        command,
         quiet=True,
+        progress_update=progress_update,
     )
     try:
         result = json.loads(process.stdout or "")
@@ -247,6 +307,7 @@ def stage_english_language_support(
     language: str,
     *,
     progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
 ) -> list[str]:
     english_resources = list_vpk_resources(extractor, pak, ("_english.txt", "_english.vtt"))
     if not english_resources:
@@ -255,9 +316,16 @@ def stage_english_language_support(
         )
         return []
     source_root_path = work / "language-support" / "english"
-    extract_vpk(extractor, pak, english_resources, source_root_path, progress=progress)
+    extract_vpk(
+        extractor,
+        pak,
+        english_resources,
+        source_root_path,
+        progress=progress,
+        progress_update=progress_update,
+    )
     staged: list[str] = []
-    for source_relative in english_resources:
+    for index, source_relative in enumerate(english_resources, start=1):
         if source_relative.endswith("_english.txt"):
             target_relative = source_relative[: -len("_english.txt")] + f"_{language}.txt"
         elif source_relative.endswith("_english.vtt"):
@@ -273,6 +341,8 @@ def stage_english_language_support(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         staged.append(target_relative)
+        if progress_update is not None:
+            progress_update("stage", index, len(english_resources))
     progress(
         f"Added {len(staged)} English-language compatibility resource(s) for -language {language}."
     )

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from pathlib import Path, PurePosixPath
+from typing import Optional
 
 from ..constants import INVISIBLE_MODEL, RESOURCE_MATERIAL, RESOURCE_MODEL, SUPPORTED_CATEGORIES
-from ..domain import Mapping, Plan
+from ..domain import Mapping, Plan, WorkProgressCallback
 from ..paths import path_under
 from ..resources import canonical, compiled_model_path, looks_like_material
 
@@ -17,7 +18,12 @@ MATERIAL_REFERENCE_PATTERN = re.compile(
 )
 
 
-def apply_model_skin_material_fallbacks(plan: Plan, cache: Path) -> Plan:
+def apply_model_skin_material_fallbacks(
+    plan: Plan,
+    cache: Path,
+    *,
+    work_progress: Optional[WorkProgressCallback] = None,
+) -> Plan:
     """Redirect confidently matched alternate model materials to their base variant.
 
     A schema ``skin`` value still applies after a cosmetic model is replaced. Source 2
@@ -57,10 +63,16 @@ def apply_model_skin_material_fallbacks(plan: Plan, cache: Path) -> Plan:
     unresolved_material_targets: set[str] = set()
     preserved_model_targets: set[str] = set()
     group_patch_targets: set[str] = set()
-    for source_model, owners in mappings_by_source.items():
+    source_count = len(mappings_by_source)
+    for source_index, (source_model, owners) in enumerate(
+        mappings_by_source.items(),
+        start=1,
+    ):
         compiled_source = path_under(cache, compiled_model_path(source_model))
         if not compiled_source.is_file():
             # Missing model sources are reported later by the normal deployment path.
+            if work_progress is not None:
+                work_progress("analyze", source_index, source_count)
             continue
         references: list[str] = []
         seen: set[str] = set()
@@ -173,6 +185,8 @@ def apply_model_skin_material_fallbacks(plan: Plan, cache: Path) -> Plan:
                         ),
                     }
                 )
+            if work_progress is not None:
+                work_progress("analyze", source_index, source_count)
             continue
 
         resolved_models += 1
@@ -202,6 +216,8 @@ def apply_model_skin_material_fallbacks(plan: Plan, cache: Path) -> Plan:
                         "reason": "multiple default models map the same alternate material differently",
                     }
                 )
+        if work_progress is not None:
+            work_progress("analyze", source_index, source_count)
 
     added = list(material_candidates.values())
     retained = [

@@ -15,7 +15,9 @@ from .constants import (
 
 
 ProgressCallback = Callable[[str], None]
-ProgressUpdateCallback = Callable[[int, str], None]
+ProgressUpdateCallback = Callable[[float, str], None]
+# Operation name, completed work units, total work units.
+WorkProgressCallback = Callable[[str, int, int], None]
 
 
 @dataclass
@@ -99,4 +101,5 @@ __all__ = [
     "Plan",
     "ProgressCallback",
     "ProgressUpdateCallback",
+    "WorkProgressCallback",
 ]

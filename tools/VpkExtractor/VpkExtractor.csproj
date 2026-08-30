@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Dota2VpkExtractor</AssemblyName>
     <RootNamespace>Dota2CosmeticDisabler.VpkExtractor</RootNamespace>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <DebugType>embedded</DebugType>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>

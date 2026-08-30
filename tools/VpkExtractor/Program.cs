@@ -5,7 +5,7 @@ namespace Dota2CosmeticDisabler.VpkExtractor;
 
 internal static class Program
 {
-    private const string Version = "0.3.1";
+    private const string Version = "0.3.2";
 
     public static int Main(string[] args)
     {
@@ -37,6 +37,8 @@ internal static class Program
 
     private static int ExtractResources(string[] args)
     {
+        var (filteredArgs, progressEnabled) = RemoveFlag(args, "--progress");
+        args = filteredArgs;
         var options = ParseOptions(args, "--vpk", "--output", "--paths-file");
         var vpkPath = RequireFile(options, "--vpk");
         var pathsFile = RequireFile(options, "--paths-file");
@@ -62,12 +64,14 @@ internal static class Program
         package.OptimizeEntriesForBinarySearch();
         package.Read(vpkPath);
 
-        foreach (var resourcePath in requested)
+        for (var index = 0; index < requested.Length; index++)
         {
+            var resourcePath = requested[index];
             var entry = package.FindEntry(resourcePath);
             if (entry is null)
             {
                 missing.Add(resourcePath);
+                ReportProgress(progressEnabled, "extract", index + 1, requested.Length);
                 continue;
             }
 
@@ -76,6 +80,7 @@ internal static class Program
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             WriteAtomically(destination, contents);
             extracted.Add(resourcePath);
+            ReportProgress(progressEnabled, "extract", index + 1, requested.Length);
         }
 
         Console.WriteLine(JsonSerializer.Serialize(new
@@ -89,6 +94,8 @@ internal static class Program
 
     private static int PackDirectory(string[] args)
     {
+        var (filteredArgs, progressEnabled) = RemoveFlag(args, "--progress");
+        args = filteredArgs;
         var options = ParseOptions(args, "--input", "--output");
         var inputRoot = Path.GetFullPath(RequireOption(options, "--input"));
         if (!Directory.Exists(inputRoot))
@@ -136,9 +143,11 @@ internal static class Program
         {
             using (var package = new Package())
             {
-                foreach (var file in files)
+                for (var index = 0; index < files.Length; index++)
                 {
+                    var file = files[index];
                     package.AddFile(file.ResourcePath, File.ReadAllBytes(file.FullPath));
+                    ReportProgress(progressEnabled, "pack", index + 1, files.Length);
                 }
                 package.Write(temporaryPath);
             }
@@ -147,8 +156,9 @@ internal static class Program
             {
                 verification.OptimizeEntriesForBinarySearch(StringComparison.Ordinal);
                 verification.Read(temporaryPath);
-                foreach (var file in files)
+                for (var index = 0; index < files.Length; index++)
                 {
+                    var file = files[index];
                     var entry = verification.FindEntry(file.ResourcePath)
                         ?? throw new InvalidDataException($"Packed VPK is missing: {file.ResourcePath}");
                     verification.ReadEntry(entry, out byte[] contents, validateCrc: true);
@@ -156,6 +166,7 @@ internal static class Program
                     {
                         throw new InvalidDataException($"Packed VPK length mismatch: {file.ResourcePath}");
                     }
+                    ReportProgress(progressEnabled, "verify", index + 1, files.Length);
                 }
             }
 
@@ -245,6 +256,31 @@ internal static class Program
             }
         }
         return options;
+    }
+
+    private static (string[] Arguments, bool Found) RemoveFlag(string[] args, string flag)
+    {
+        var count = args.Count(argument => string.Equals(argument, flag, StringComparison.Ordinal));
+        if (count > 1)
+        {
+            throw new ArgumentException($"Flag was supplied more than once: {flag}");
+        }
+        return (
+            args.Where(argument => !string.Equals(argument, flag, StringComparison.Ordinal)).ToArray(),
+            count == 1);
+    }
+
+    private static void ReportProgress(bool enabled, string phase, int completed, int total)
+    {
+        if (!enabled)
+        {
+            return;
+        }
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            progress = new { phase, completed, total },
+        }));
+        Console.Out.Flush();
     }
 
     private static string RequireOption(IReadOnlyDictionary<string, string> options, string name)

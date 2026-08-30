@@ -1574,6 +1574,7 @@ class DeploymentTests(unittest.TestCase):
             self.assertEqual(percentages, sorted(percentages))
             self.assertEqual(percentages[0], 0)
             self.assertEqual(percentages[-1], 100)
+            self.assertTrue(any(not value.is_integer() for value in percentages))
             marker = json.loads((output / generator.MARKER_FILENAME).read_text(encoding="utf-8"))
             self.assertEqual(marker["deployment_mode"], generator.VPK_DEPLOYMENT_MODE)
             self.assertEqual(marker["files"], ["pak98_dir.vpk"])
@@ -1627,13 +1628,21 @@ class DeploymentTests(unittest.TestCase):
             source.write_bytes(b"compiled model")
             output = root / "dota_dutch"
 
-            def fake_patch(_patcher, jobs, _manifest_directory, *, progress):
+            def fake_patch(
+                _patcher,
+                jobs,
+                _manifest_directory,
+                *,
+                progress,
+                progress_update,
+            ):
                 self.assertEqual(len(jobs), 1)
                 patch_source, destination, groups = jobs[0]
                 self.assertTrue(os.path.samefile(patch_source, source))
                 self.assertEqual(groups, 3)
                 destination.parent.mkdir(parents=True)
                 destination.write_bytes(patch_source.read_bytes() + b";groups=3")
+                progress_update("patch", 1, 1)
 
             with patch(
                 "dota_disabler.deployment.patch_model_material_groups_batch",
@@ -2299,15 +2308,33 @@ class VpkExtractorIntegrationTests(unittest.TestCase):
                 resource.write_bytes(payload)
             archive = root / "pak99_dir.vpk"
 
-            packed = generator.pack_vpk(extractor, staged, archive)
+            pack_progress = []
+            packed = generator.pack_vpk(
+                extractor,
+                staged,
+                archive,
+                progress_update=lambda phase, completed, total: pack_progress.append(
+                    (phase, completed, total)
+                ),
+            )
             self.assertEqual(packed, len(resources))
+            self.assertEqual(pack_progress[0], ("pack", 1, len(resources)))
+            self.assertEqual(pack_progress[-1], ("verify", len(resources), len(resources)))
 
             extracted = root / "extracted"
+            extract_progress = []
             generator.extract_vpk(
                 extractor,
                 archive,
                 tuple(resources),
                 extracted,
+                progress_update=lambda phase, completed, total: extract_progress.append(
+                    (phase, completed, total)
+                ),
+            )
+            self.assertEqual(
+                extract_progress[-1],
+                ("extract", len(resources), len(resources)),
             )
             for relative, payload in resources.items():
                 self.assertEqual(extracted.joinpath(*relative.split("/")).read_bytes(), payload)

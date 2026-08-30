@@ -28,6 +28,7 @@ from .domain import CleanResult, Plan, ProgressCallback, ProgressUpdateCallback
 from .errors import GeneratorError, UnsafeOutputError
 from .model_patcher import patch_model_material_groups_batch
 from .paths import path_under
+from .progress import DEPLOYMENT_PHASE_WEIGHTS, WeightedProgress
 from .reporting import write_json
 from .resources import (
     compiled_model_path,
@@ -230,16 +231,13 @@ def deploy_overrides(
         if enabled_categories is not None
         else {mapping.category for mapping in plan.mappings}
     )
+    deployment_progress = WeightedProgress(progress_update, DEPLOYMENT_PHASE_WEIGHTS)
+    deployment_progress.begin("staging", "Preparing override files")
+
     staging = work / "staging" / language
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
-
-    def report_progress(percent: int, message: str) -> None:
-        if progress_update is not None:
-            progress_update(max(0, min(100, percent)), message)
-
-    report_progress(0, "Preparing override files")
 
     skin_patch_mappings = [
         mapping
@@ -256,7 +254,6 @@ def deploy_overrides(
     staged_files: list[str] = []
     patch_jobs: list[tuple[Path, Path, int]] = []
     mapping_count = len(plan.mappings)
-    last_staging_percent = -1
     for index, mapping in enumerate(plan.mappings, start=1):
         source_relative = compiled_override_path(mapping.source, mapping.resource_type)
         target_relative = compiled_override_path(mapping.target, mapping.resource_type)
@@ -271,6 +268,12 @@ def deploy_overrides(
                     "item_id": mapping.item_id,
                 }
             )
+            deployment_progress.work(
+                "staging",
+                index,
+                mapping_count,
+                f"Staging overrides ({index:,} of {mapping_count:,})",
+            )
             continue
         destination = path_under(staging, target_relative)
         if mapping.resource_type == RESOURCE_MODEL and mapping.required_material_groups > 1:
@@ -279,15 +282,16 @@ def deploy_overrides(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         staged_files.append(target_relative)
-        staging_percent = round(index * 50 / mapping_count) if mapping_count else 50
-        if staging_percent > last_staging_percent:
-            report_progress(
-                staging_percent,
-                f"Staging overrides ({index:,} of {mapping_count:,})",
-            )
-            last_staging_percent = staging_percent
+        deployment_progress.work(
+            "staging",
+            index,
+            mapping_count,
+            f"Staging overrides ({index:,} of {mapping_count:,})",
+        )
 
-    report_progress(50, f"Staged {len(staged_files):,} override resource(s)")
+    deployment_progress.complete(
+        "staging", f"Staged {len(staged_files):,} override resource(s)"
+    )
 
     missing_path = work / "missing-resources.json"
     legacy_missing_path = work / "missing-models.json"
@@ -304,17 +308,34 @@ def deploy_overrides(
     elif missing_path.is_file():
         missing_path.unlink()
 
+    deployment_progress.begin("model_patch", "Preparing skin-sensitive default models")
     if patch_jobs:
-        report_progress(52, "Patching skin-sensitive default models")
         patch_model_material_groups_batch(
             model_patcher,
             patch_jobs,
             staging,
             progress=progress,
+            progress_update=deployment_progress.work_callback(
+                "model_patch", "Patching skin-sensitive models"
+            ),
         )
-    report_progress(67, "Default model preparation complete")
+    deployment_progress.complete("model_patch", "Default model preparation complete")
 
-    report_progress(68, "Adding English interface resources")
+    def language_progress(operation: str, completed: int, total: int) -> None:
+        phase = "language_stage" if operation == "stage" else "language_extract"
+        label = (
+            "Staging English interface resources"
+            if operation == "stage"
+            else "Extracting English interface resources"
+        )
+        deployment_progress.work(
+            phase,
+            completed,
+            total,
+            f"{label} ({completed:,} of {total:,})",
+        )
+
+    deployment_progress.begin("language_extract", "Adding English interface resources")
     support_resources = (
         stage_english_language_support(
             extractor,
@@ -323,11 +344,17 @@ def deploy_overrides(
             staging,
             language,
             progress=progress,
+            progress_update=language_progress,
         )
         if game_pak is not None
         else []
     )
-    report_progress(75, "Language compatibility resources ready")
+    deployment_progress.complete(
+        "language_extract", "English interface resources extracted"
+    )
+    deployment_progress.complete(
+        "language_stage", "Language compatibility resources ready"
+    )
     # Current Dota loads the economy schema before recognized-language VPK
     # overrides are considered. A structurally valid items_game.txt overlay was
     # therefore ignored in live testing. Bodygroup-sensitive wearables now use
@@ -354,9 +381,31 @@ def deploy_overrides(
         shutil.rmtree(package_root)
     package_root.mkdir(parents=True)
     staged_archive = package_root / archive_name
-    report_progress(78, "Packing and CRC-validating the override VPK")
-    packed = pack_vpk(extractor, staging, staged_archive, progress=progress)
-    report_progress(92, "Override VPK packed and validated")
+
+    def archive_progress(operation: str, completed: int, total: int) -> None:
+        phase = "verify" if operation == "verify" else "pack"
+        label = (
+            "CRC-validating override files"
+            if operation == "verify"
+            else "Packing override files"
+        )
+        deployment_progress.work(
+            phase,
+            completed,
+            total,
+            f"{label} ({completed:,} of {total:,})",
+        )
+
+    deployment_progress.begin("pack", "Packing the override VPK")
+    packed = pack_vpk(
+        extractor,
+        staging,
+        staged_archive,
+        progress=progress,
+        progress_update=archive_progress,
+    )
+    deployment_progress.complete("pack", "Override files packed")
+    deployment_progress.complete("verify", "Override VPK packed and CRC-validated")
     unique_resources = sorted(set(staged_files))
     if packed != len(unique_resources) + len(support_resources) + len(schema_resources):
         raise GeneratorError("The VPK resource count does not match the staged override count.")
@@ -385,16 +434,19 @@ def deploy_overrides(
             )
         if target.is_file():
             obsolete_rollbacks.append((target, rollback))
-    if archive_destination.is_file():
-        os.replace(archive_destination, rollback_destination)
-
-    report_progress(95, "Installing the validated override VPK")
+    deployment_progress.begin("install", "Installing the validated override VPK")
     committed = False
     try:
+        if archive_destination.is_file():
+            os.replace(archive_destination, rollback_destination)
+        deployment_progress.work("install", 1, 6, "Securing the previous owned VPK")
         for target, rollback in obsolete_rollbacks:
             os.replace(target, rollback)
+        deployment_progress.work("install", 2, 6, "Securing obsolete owned files")
         shutil.copy2(staged_archive, temporary_destination)
+        deployment_progress.work("install", 3, 6, "Copying the validated override VPK")
         os.replace(temporary_destination, archive_destination)
+        deployment_progress.work("install", 4, 6, "Activating the validated override VPK")
 
         write_json(
             output_root / MARKER_FILENAME,
@@ -415,7 +467,7 @@ def deploy_overrides(
             },
         )
         committed = True
-        report_progress(100, "Override VPK installed")
+        deployment_progress.work("install", 5, 6, "Recording generated-file ownership")
     except Exception:
         try:
             if archive_destination.is_file():
@@ -463,6 +515,7 @@ def deploy_overrides(
                     "WARNING: The new marker and VPK were committed, but empty legacy "
                     f"directories could not be pruned: {exc}"
                 )
+    deployment_progress.complete("install", "Override VPK installed")
     return len(unique_resources), missing
 
 

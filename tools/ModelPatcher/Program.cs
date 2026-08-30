@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.1.0";
+    private const string Version = "0.1.1";
 
     public static int Main(string[] args)
     {
@@ -41,6 +41,8 @@ internal static partial class Program
 
     private static int PatchBatch(string[] args)
     {
+        var (filteredArgs, progressEnabled) = RemoveFlag(args, "--progress");
+        args = filteredArgs;
         var options = ParseOptions(args, "--manifest");
         var manifestPath = RequireFile(options, "--manifest", ".tsv");
         var lines = File.ReadAllLines(manifestPath);
@@ -63,6 +65,7 @@ internal static partial class Program
                 return result;
             }
             patched++;
+            ReportProgress(progressEnabled, "patch", patched, lines.Length);
         }
         Console.WriteLine($"{{\"patched\":{patched}}}");
         return 0;
@@ -361,6 +364,29 @@ internal static partial class Program
             }
         }
         return options;
+    }
+
+    private static (string[] Arguments, bool Found) RemoveFlag(string[] args, string flag)
+    {
+        var count = args.Count(argument => string.Equals(argument, flag, StringComparison.Ordinal));
+        if (count > 1)
+        {
+            throw new ArgumentException($"Flag was supplied more than once: {flag}");
+        }
+        return (
+            args.Where(argument => !string.Equals(argument, flag, StringComparison.Ordinal)).ToArray(),
+            count == 1);
+    }
+
+    private static void ReportProgress(bool enabled, string phase, int completed, int total)
+    {
+        if (!enabled)
+        {
+            return;
+        }
+        Console.WriteLine(
+            $"{{\"progress\":{{\"phase\":\"{phase}\",\"completed\":{completed},\"total\":{total}}}}}");
+        Console.Out.Flush();
     }
 
     private static string RequireOption(IReadOnlyDictionary<string, string> options, string name)

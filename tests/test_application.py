@@ -28,7 +28,7 @@ class BuildOrchestrationTests(unittest.TestCase):
                 "particle_snapshot_overrides": 0,
             },
         )
-        updates: list[tuple[int, str]] = []
+        updates: list[tuple[float, str]] = []
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -45,7 +45,7 @@ class BuildOrchestrationTests(unittest.TestCase):
 
             def fake_deploy(*_args, progress_update, **_kwargs):
                 progress_update(0, "Preparing override files")
-                progress_update(50, "Staged override files")
+                progress_update(50.5, "Staged override files")
                 progress_update(100, "Override VPK installed")
                 return 0, []
 
@@ -93,11 +93,11 @@ class BuildOrchestrationTests(unittest.TestCase):
 
         percentages = [percent for percent, _message in updates]
         self.assertEqual(percentages, sorted(percentages))
-        self.assertEqual(percentages[0], 1)
+        self.assertEqual(percentages[0], 0)
         self.assertEqual(percentages[-1], 100)
-        self.assertIn(84, percentages)
+        self.assertTrue(any(not percent.is_integer() for percent in percentages))
         self.assertIn(
-            "Planning cosmetic replacements",
+            "Staged override files",
             {message for _percent, message in updates},
         )
 
