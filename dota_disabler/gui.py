@@ -160,7 +160,7 @@ class FlatButton(tk.Button):
             cursor="hand2",
             font=("Segoe UI Semibold", 10),
             padx=15 if compact else 20,
-            pady=7 if compact else 11,
+            pady=5 if compact else 11,
             highlightthickness=0,
         )
         self._normal_bg = background
@@ -189,6 +189,7 @@ class DisablerApp:
         self.events: queue.Queue[tuple] = queue.Queue()
         self.busy = False
         self.closing_requested = False
+        self.details_expanded = False
         self.settings = load_ui_settings()
         self.path_var = tk.StringVar(value=self.settings.get("dota_path") or "")
         self.language_var = tk.StringVar(value=language_label(self.settings["language"]))
@@ -255,7 +256,8 @@ class DisablerApp:
         )
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(1, weight=0)
-        self.root.grid_rowconfigure(2, weight=1)
+        self.root.grid_rowconfigure(2, weight=0)
+        self.root.grid_rowconfigure(3, weight=1)
         self._center_window(width, height, (work_left, work_top, work_width, work_height))
 
     def _center_window(self, width: int, height: int, work_area: tuple[int, int, int, int]) -> None:
@@ -273,6 +275,7 @@ class DisablerApp:
         content.grid_rowconfigure(0, weight=0)
         self._build_installation_panel(content)
         self._build_features_panel(content)
+        self._build_action_bar()
         self._build_activity_panel()
 
     def _build_header(self) -> None:
@@ -325,14 +328,14 @@ class DisablerApp:
         panel.grid_columnconfigure(0, weight=1)
 
         tk.Label(panel, text="DOTA 2 INSTALLATION", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)).grid(
-            row=0, column=0, sticky="w", padx=20, pady=(18, 4)
+            row=0, column=0, sticky="w", padx=20, pady=(12, 4)
         )
-        tk.Label(panel, text="Game folder", bg=SURFACE, fg=TEXT, font=("Segoe UI Semibold", 14)).grid(
+        tk.Label(panel, text="Installation & build status", bg=SURFACE, fg=TEXT, font=("Segoe UI Semibold", 14)).grid(
             row=1, column=0, sticky="w", padx=20
         )
 
         path_frame = tk.Frame(panel, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
-        path_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 8))
+        path_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(8, 6))
         path_frame.grid_columnconfigure(0, weight=1)
         self.path_entry = tk.Entry(
             path_frame,
@@ -345,7 +348,7 @@ class DisablerApp:
             bd=0,
             font=("Segoe UI", 10),
         )
-        self.path_entry.grid(row=0, column=0, sticky="ew", padx=12, pady=11)
+        self.path_entry.grid(row=0, column=0, sticky="ew", padx=12, pady=8)
         self.path_entry.bind("<Return>", lambda _event: self._refresh_status())
         self.path_entry.bind("<KeyRelease>", self._path_edited)
         self.busy_controls.append(self.path_entry)
@@ -361,7 +364,7 @@ class DisablerApp:
         self.busy_controls.extend((self.browse_button, self.detect_button))
 
         separator = tk.Frame(panel, bg=BORDER_SOFT, height=1)
-        separator.grid(row=4, column=0, sticky="ew", padx=20, pady=18)
+        separator.grid(row=4, column=0, sticky="ew", padx=20, pady=10)
 
         versions = tk.Frame(panel, bg=SURFACE)
         versions.grid(row=5, column=0, sticky="ew", padx=20)
@@ -374,14 +377,14 @@ class DisablerApp:
         )
         self.current_version.grid(row=0, column=1, sticky="e")
         tk.Label(versions, text="Overrides built from", bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).grid(
-            row=1, column=0, sticky="w", pady=(10, 0)
+            row=1, column=0, sticky="w", pady=(7, 0)
         )
         self.recorded_version = tk.Label(
             versions, text="—", bg=SURFACE, fg=TEXT_SOFT, font=("Segoe UI Semibold", 10), anchor="e"
         )
-        self.recorded_version.grid(row=1, column=1, sticky="e", pady=(10, 0))
+        self.recorded_version.grid(row=1, column=1, sticky="e", pady=(7, 0))
         tk.Label(versions, text="Mount language · English UI", bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).grid(
-            row=2, column=0, sticky="w", pady=(10, 0)
+            row=2, column=0, sticky="w", pady=(7, 0)
         )
         self.language_combo = ttk.Combobox(
             versions,
@@ -392,7 +395,7 @@ class DisablerApp:
             style="Dota.TCombobox",
             justify="right",
         )
-        self.language_combo.grid(row=2, column=1, sticky="e", pady=(10, 0))
+        self.language_combo.grid(row=2, column=1, sticky="e", pady=(7, 0))
         self.language_combo.bind("<<ComboboxSelected>>", self._language_changed)
         self.busy_controls.append(self.language_combo)
 
@@ -404,19 +407,11 @@ class DisablerApp:
             anchor="w",
             justify="left",
             padx=12,
-            pady=10,
+            pady=5,
             font=("Segoe UI", 9),
+            wraplength=300,
         )
-        self.status_detail.grid(row=6, column=0, sticky="ew", padx=20, pady=(18, 12))
-
-        action_row = tk.Frame(panel, bg=SURFACE)
-        action_row.grid(row=7, column=0, sticky="ew", padx=20, pady=(0, 18))
-        action_row.grid_columnconfigure(0, weight=1)
-        self.build_button = FlatButton(action_row, text="Build Overrides", command=self._build, primary=True)
-        self.build_button.grid(row=0, column=0, sticky="ew")
-        self.clean_button = FlatButton(action_row, text="Remove Overrides", command=self._clean)
-        self.clean_button.grid(row=0, column=1, padx=(9, 0))
-        self.busy_controls.extend((self.build_button, self.clean_button))
+        self.status_detail.grid(row=6, column=0, sticky="ew", padx=20, pady=(8, 8))
 
     def _build_features_panel(self, parent: tk.Frame) -> None:
         border, panel = _card(parent)
@@ -425,10 +420,10 @@ class DisablerApp:
         panel.grid_columnconfigure(1, weight=1)
 
         tk.Label(panel, text="COSMETICS TO DISABLE", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)).grid(
-            row=0, column=0, sticky="w", padx=20, pady=(18, 4)
+            row=0, column=0, sticky="w", padx=20, pady=(12, 4)
         )
         presets = tk.Frame(panel, bg=SURFACE)
-        presets.grid(row=0, column=1, sticky="e", padx=20, pady=(12, 0))
+        presets.grid(row=0, column=1, sticky="e", padx=20, pady=(8, 0))
         select_all = FlatButton(
             presets,
             text="Select all",
@@ -453,7 +448,7 @@ class DisablerApp:
         ).grid(row=1, column=0, columnspan=2, sticky="w", padx=20)
 
         supported = tk.Frame(panel, bg=SURFACE)
-        supported.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=(10, 8))
+        supported.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=(7, 5))
         feature_columns = 2
         for column in range(feature_columns):
             supported.grid_columnconfigure(column, weight=1, uniform="feature")
@@ -474,7 +469,7 @@ class DisablerApp:
             anchor="w",
             justify="left",
             wraplength=520,
-        ).grid(row=3, column=0, columnspan=2, sticky="ew", padx=20, pady=(5, 14))
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", padx=20, pady=(2, 9))
 
     def _build_feature_card(self, parent: tk.Frame, feature: dict, row: int, column: int) -> None:
         card = tk.Frame(parent, bg=SURFACE_ALT, highlightbackground=BORDER_SOFT, highlightthickness=1)
@@ -486,13 +481,13 @@ class DisablerApp:
             bg=SURFACE_ALT,
             fg=AMBER if feature["tag"] == "EXPERIMENTAL" else GREEN,
             font=("Segoe UI Semibold", 7),
-        ).grid(row=0, column=0, sticky="w", padx=11, pady=(8, 2))
+        ).grid(row=0, column=0, sticky="w", padx=11, pady=(6, 1))
         toggle = ToggleSwitch(
             card,
             self.category_vars[feature["key"]],
             self._category_changed,
         )
-        toggle.grid(row=0, column=1, sticky="e", padx=9, pady=(5, 0))
+        toggle.grid(row=0, column=1, sticky="e", padx=9, pady=(4, 0))
         self.toggle_controls.append(toggle)
         tk.Label(
             card,
@@ -512,25 +507,67 @@ class DisablerApp:
             anchor="nw",
             wraplength=230,
             font=("Segoe UI", 9),
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(1, 9))
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(1, 6))
+
+    def _build_action_bar(self) -> None:
+        border, panel = _card(self.root)
+        border.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 10))
+        panel.grid_columnconfigure(0, weight=1)
+
+        summary = tk.Frame(panel, bg=SURFACE)
+        summary.grid(row=0, column=0, sticky="w", padx=18, pady=7)
+        tk.Label(
+            summary,
+            text="BUILD SUMMARY",
+            bg=SURFACE,
+            fg=MUTED,
+            font=("Segoe UI Semibold", 8),
+        ).grid(row=0, column=0, sticky="w")
+        self.action_summary = tk.Label(
+            summary,
+            text="",
+            bg=SURFACE,
+            fg=TEXT_SOFT,
+            font=("Segoe UI", 10),
+        )
+        self.action_summary.grid(row=1, column=0, sticky="w", pady=(2, 0))
+
+        self.clean_button = FlatButton(
+            panel,
+            text="Remove owned overrides",
+            command=self._clean,
+            compact=True,
+        )
+        self.clean_button.grid(row=0, column=1, sticky="e", padx=(8, 0), pady=7)
+        self.build_button = FlatButton(
+            panel,
+            text="Build Overrides",
+            command=self._build,
+            primary=True,
+            compact=True,
+        )
+        self.build_button.grid(row=0, column=2, sticky="e", padx=(10, 18), pady=7)
+        self.busy_controls.extend((self.clean_button, self.build_button))
+        self._update_action_summary()
 
     def _build_activity_panel(self) -> None:
         border, panel = _card(self.root)
-        border.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 18))
+        border.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 18))
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_rowconfigure(2, weight=1)
         self.activity_panel = panel
 
         activity_header = tk.Frame(panel, bg=SURFACE)
-        activity_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(10, 5))
+        activity_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(7, 4))
         activity_header.grid_columnconfigure(0, weight=1)
         self.activity_title = tk.Label(
-            activity_header, text="ACTIVITY", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)
+            activity_header,
+            text="Current activity",
+            bg=SURFACE,
+            fg=TEXT_SOFT,
+            font=("Segoe UI Semibold", 10),
         )
         self.activity_title.grid(row=0, column=0, sticky="w")
-        self.open_report_button = FlatButton(
-            activity_header, text="Open report", command=self._open_report, compact=True
-        )
         self.progress_label = tk.Label(
             activity_header,
             text="",
@@ -539,15 +576,44 @@ class DisablerApp:
             font=("Segoe UI Semibold", 9),
         )
         self.progress_label.grid(row=0, column=1, padx=(8, 4))
-        self.open_report_button.grid(row=0, column=2, padx=(8, 0))
+        self.result_actions = tk.Frame(activity_header, bg=SURFACE)
+        self.result_actions.grid(row=0, column=2, padx=(8, 0))
+        self.open_report_button = FlatButton(
+            self.result_actions,
+            text="Report",
+            command=self._open_report,
+            compact=True,
+        )
+        self.open_report_button.pack(side="left")
         self.open_output_button = FlatButton(
-            activity_header, text="Open output", command=self._open_output, compact=True
+            self.result_actions,
+            text="Output",
+            command=self._open_output,
+            compact=True,
         )
-        self.open_output_button.grid(row=0, column=3, padx=(8, 0))
+        self.open_output_button.pack(side="left", padx=(8, 0))
         self.copy_launch_button = FlatButton(
-            activity_header, text="Copy launch option", command=self._copy_launch_option, compact=True
+            self.result_actions,
+            text="Copy launch option",
+            command=self._copy_launch_option,
+            compact=True,
         )
-        self.copy_launch_button.grid(row=0, column=4, padx=(8, 0))
+        self.copy_launch_button.pack(side="left", padx=(8, 0))
+        self.busy_controls.extend(
+            (
+                self.open_report_button,
+                self.open_output_button,
+                self.copy_launch_button,
+            )
+        )
+        self.result_actions.grid_remove()
+        self.details_button = FlatButton(
+            activity_header,
+            text="Show details",
+            command=self._toggle_activity_details,
+            compact=True,
+        )
+        self.details_button.grid(row=0, column=3, padx=(8, 0))
 
         self.progress = ttk.Progressbar(
             panel,
@@ -557,6 +623,26 @@ class DisablerApp:
             style="Dota.Horizontal.TProgressbar",
         )
         self.progress.grid(row=1, column=0, sticky="ew", padx=16)
+
+        self.activity_summary = tk.Label(
+            panel,
+            text="Ready. Dota will be detected automatically.",
+            bg="#0d131b",
+            fg=TEXT_SOFT,
+            anchor="nw",
+            justify="left",
+            padx=11,
+            pady=8,
+            wraplength=1050,
+            font=("Segoe UI", 9),
+        )
+        self.activity_summary.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=16,
+            pady=(6, 7),
+        )
 
         self.log = tk.Text(
             panel,
@@ -574,17 +660,10 @@ class DisablerApp:
             font=("Cascadia Mono", 8),
         )
         self.log.grid(row=2, column=0, sticky="nsew", padx=16, pady=(6, 7))
-        tk.Label(
-            panel,
-            text=(
-                "Unofficial overrides  ·  Steam › Dota 2 › Properties › Launch Options  ·  "
-                "Test in Demo Hero first  ·  No anti-cheat guarantee"
-            ),
-            bg=SURFACE,
-            fg=MUTED,
-            font=("Segoe UI", 8),
-            anchor="w",
-        ).grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 9))
+        self.log.grid_remove()
+        self._append_log(
+            "Safety: unofficial overrides; test in Demo Hero first; no anti-cheat guarantee."
+        )
         self._append_log("Ready. Dota will be detected automatically.")
 
     def _selected_categories(self) -> set[str]:
@@ -598,10 +677,26 @@ class DisablerApp:
     def _selected_language(self) -> str:
         return LANGUAGE_LABEL_TO_CODE.get(self.language_var.get(), engine.DEFAULT_LANGUAGE)
 
+    def _update_action_summary(self) -> None:
+        selected = sum(variable.get() for variable in self.category_vars.values())
+        if selected:
+            noun = "category" if selected == 1 else "categories"
+            language = LANGUAGE_NAMES[self._selected_language()]
+            text = (
+                f"{selected} of {len(FEATURES)} {noun} selected"
+                f"  ·  {language} compatibility mount"
+            )
+            color = TEXT_SOFT
+        else:
+            text = "Choose at least one cosmetic category before building"
+            color = AMBER
+        self.action_summary.configure(text=text, fg=color)
+
     def _category_changed(self) -> None:
         self._save_preferences()
         selected = sum(variable.get() for variable in self.category_vars.values())
-        self._append_log(f"Selected {selected} of {len(FEATURES)} supported replacement categories.")
+        self._append_log(f"Selected {selected} of {len(FEATURES)} replacement categories.")
+        self._update_action_summary()
         if self.last_status is not None and status_matches_path(self.last_status, self.path_var.get()):
             self._apply_status(self.last_status)
 
@@ -611,6 +706,8 @@ class DisablerApp:
         language = self._selected_language()
         self.last_status = None
         self._save_preferences()
+        self._update_action_summary()
+        self._set_result_actions_visible(False)
         self.header_status.configure(text="  CHECKING MOUNT  ", fg=BLUE, bg=SURFACE_ALT)
         self.status_detail.configure(
             text=f"Checking the {language} compatibility mount; rebuild to apply a new selection",
@@ -624,6 +721,7 @@ class DisablerApp:
 
     def _path_edited(self, _event=None) -> None:
         self.last_status = None
+        self._set_result_actions_visible(False)
         self.header_status.configure(text="  CHECK PATH  ", fg=AMBER, bg=SURFACE_ALT)
         self.status_detail.configure(text="Folder changed; refresh to validate it", fg=AMBER)
         self.path_source.configure(text="Edited · press Enter or Refresh", fg=AMBER)
@@ -694,7 +792,7 @@ class DisablerApp:
         if not categories:
             messagebox.showwarning(
                 "Choose a category",
-                "Select at least one supported model category before building.",
+                "Select at least one replacement category before building.",
                 parent=self.root,
             )
             return
@@ -812,6 +910,7 @@ class DisablerApp:
             self._append_log("Patch status refreshed.")
         elif kind == "build":
             self.last_result, status, status_error = result  # type: ignore[misc]
+            self._set_result_actions_visible(True)
             self.path_var.set(str(self.last_result.dota))
             self._append_log(f"Build complete: {self.last_result.copied} model/effect resource overrides.")
             if status_error is not None:
@@ -820,6 +919,7 @@ class DisablerApp:
                 self._apply_status(status)
         elif kind == "clean":
             clean_result, status, status_error = result  # type: ignore[misc]
+            self._set_result_actions_visible(False)
             self._append_log(f"Cleanup complete: {clean_result.removed} owned files removed.")
             self._append_log(
                 f"Remove '-language {self._selected_language()}' from Steam launch options if you no longer need it."
@@ -870,11 +970,11 @@ class DisablerApp:
         for toggle in self.toggle_controls:
             toggle.set_enabled(not busy)
         if busy:
-            self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
+            self.activity_title.configure(text=message, fg=TEXT_SOFT)
             self.progress.configure(value=0.0)
             self.progress_label.configure(text="0.0%")
         else:
-            self.activity_title.configure(text="ACTIVITY", fg=MUTED)
+            self.activity_title.configure(text="Current activity", fg=TEXT_SOFT)
 
     def _set_progress(self, percent: float, message: str = "") -> None:
         percent = max(0.0, min(100.0, percent))
@@ -885,7 +985,7 @@ class DisablerApp:
         label = "100%" if percent >= 100.0 else f"{percent:.1f}%"
         self.progress_label.configure(text=label)
         if self.busy and message:
-            self.activity_title.configure(text=message.upper(), fg=TEXT_SOFT)
+            self.activity_title.configure(text=message, fg=TEXT_SOFT)
 
     def _apply_status(self, result: dict) -> None:
         self.last_status = result
@@ -901,8 +1001,26 @@ class DisablerApp:
         )
         self.status_detail.configure(text=detail, fg=view["color"])
         self.build_button.set_text(view["action"])
+        self._set_result_actions_visible(result.get("status") != "not_built")
         self.current_version.configure(text=engine.dota_version_label(result.get("current_dota_version")))
         self.recorded_version.configure(text=engine.dota_version_label(result.get("recorded_dota_version")))
+
+    def _toggle_activity_details(self) -> None:
+        self.details_expanded = not self.details_expanded
+        if self.details_expanded:
+            self.activity_summary.grid_remove()
+            self.log.grid()
+            self.details_button.set_text("Hide details")
+        else:
+            self.log.grid_remove()
+            self.activity_summary.grid()
+            self.details_button.set_text("Show details")
+
+    def _set_result_actions_visible(self, visible: bool) -> None:
+        if visible:
+            self.result_actions.grid()
+        else:
+            self.result_actions.grid_remove()
 
     def _append_log(self, message: str, *, error: bool = False) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -914,6 +1032,12 @@ class DisablerApp:
             self.log.insert("end", f"[{timestamp}] {line}\n", tag)
         self.log.see("end")
         self.log.configure(state="disabled")
+        summary = next((line for line in reversed(lines) if line.strip()), "")
+        if summary:
+            self.activity_summary.configure(
+                text=summary,
+                fg=RED if error else TEXT_SOFT,
+            )
 
     def _open_report(self) -> None:
         path = self.last_result.report if self.last_result else engine.application_root() / ".work/model-plan.json"
@@ -972,13 +1096,52 @@ def run_gui(*, smoke_test: bool = False) -> int:
     app = DisablerApp(root, start_detection=not smoke_test)
     if smoke_test:
         root.update_idletasks()
-        required = (app.path_entry, app.language_combo, app.build_button, app.clean_button, app.log)
+        required = (
+            app.path_entry,
+            app.language_combo,
+            app.action_summary,
+            app.build_button,
+            app.clean_button,
+            app.details_button,
+            app.log,
+        )
         if not all(widget.winfo_exists() for widget in required):
             raise RuntimeError("GUI smoke test could not construct the essential controls.")
-        if root.grid_rowconfigure(1)["weight"] != 0 or root.grid_rowconfigure(2)["weight"] != 1:
+        if (
+            root.grid_rowconfigure(1)["weight"] != 0
+            or root.grid_rowconfigure(2)["weight"] != 0
+            or root.grid_rowconfigure(3)["weight"] != 1
+        ):
             raise RuntimeError("GUI resize ownership is not assigned to the activity panel.")
         if app.activity_panel.grid_rowconfigure(2)["weight"] != 1:
             raise RuntimeError("GUI log row is not configured to absorb additional height.")
+        selected_count = sum(variable.get() for variable in app.category_vars.values())
+        summary_text = str(app.action_summary.cget("text"))
+        if selected_count:
+            expected_summary = f"{selected_count} of {len(FEATURES)} "
+        else:
+            expected_summary = "Choose at least one cosmetic category"
+        if expected_summary not in summary_text:
+            raise RuntimeError("GUI build summary did not reflect the selected categories.")
+        if app.log.grid_info() or not app.activity_summary.grid_info():
+            raise RuntimeError("GUI activity details did not start collapsed.")
+        if app.result_actions.grid_info():
+            raise RuntimeError("GUI result actions appeared without a usable result.")
+        app._set_result_actions_visible(True)
+        if not app.result_actions.grid_info():
+            raise RuntimeError("GUI result actions could not be revealed contextually.")
+        app._toggle_activity_details()
+        if not app.log.grid_info() or app.activity_summary.grid_info():
+            raise RuntimeError("GUI activity details could not be expanded.")
+        if str(app.details_button.cget("text")) != "Hide details":
+            raise RuntimeError("GUI activity detail control did not update its label.")
+        app._set_busy(True, "Packing files")
+        app._set_progress(42.5, "Packing files")
+        if str(app.activity_title.cget("text")) != "Packing files":
+            raise RuntimeError("GUI activity copy was unexpectedly transformed.")
+        if str(app.progress_label.cget("text")) != "42.5%":
+            raise RuntimeError("GUI progress label did not preserve granular progress.")
+        app._set_busy(False)
         root.destroy()
         return 0
     root.mainloop()

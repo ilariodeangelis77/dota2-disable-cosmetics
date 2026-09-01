@@ -101,8 +101,8 @@ and GitHub-hosted Windows releases are not code-signed.
 
 6. Start Dota and verify the result in the Armory, Demo Hero, or a custom lobby.
 
-Remove the launch option to disable the generated override immediately. Use **Remove Overrides** in
-the dashboard when you also want to remove the tool-owned VPK.
+Remove the launch option to disable the generated override immediately. Use
+**Remove owned overrides** in the dashboard when you also want to remove the tool-owned VPK.
 
 ## Desktop dashboard
 
@@ -111,10 +111,13 @@ The dashboard can:
 - Detect a Dota installation or accept a manually selected path.
 - Show the installed Dota build, the build used by the current overrides, and their status.
 - Select a recognized language mount and any combination of supported categories.
+- Review the current category and language selection in a full-width build summary before starting;
+  cleanup remains available there as a secondary maintenance action.
 - Build and clean in the background while displaying real item, resource, model, material,
   particle, and per-file progress on a determinate bar with `0.1%` display precision.
-- Open generated reports and output folders.
-- Copy the required Steam launch option.
+- Keep the latest activity visible in a compact summary or expand the timestamped activity history.
+- Open generated reports and output folders, or copy the required Steam launch option, after a
+  usable override result is available.
 
 Language and category preferences are stored locally in `.work/ui-settings.json`. Keep the
 dashboard open while a build or cleanup is running.
