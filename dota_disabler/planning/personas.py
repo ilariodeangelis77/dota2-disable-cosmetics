@@ -39,6 +39,18 @@ PERSONA_PROFILES = {
                 ("tail_persona_1", "weapon"),
             ),
         ),
+        PersonaProfile(
+            hero="npc_dota_hero_phantom_assassin",
+            # PA's Persona has four wearable slots while the normal hero has
+            # five. Restore the helmet, shoulders, cape, and weapon that define
+            # her silhouette; omit only the small belt-mounted daggers.
+            slot_fallbacks=(
+                ("head_persona_1", "head"),
+                ("armor_persona_1", "shoulder"),
+                ("legs_persona_1", "back"),
+                ("weapon_persona_1", "weapon"),
+            ),
+        ),
     )
 }
 

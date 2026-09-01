@@ -420,6 +420,136 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
         self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
 
+    def test_phantom_assassin_persona_uses_reviewed_normal_wearable_slots(self):
+        hero = "npc_dota_hero_phantom_assassin"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/phantom_assassin/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("head", "phantom_assassin_helmet"),
+                    ("shoulder", "phantom_assassin_shoulders"),
+                    ("back", "phantom_assassin_cape"),
+                    ("weapon", "phantom_assassin_weapon"),
+                    ("belt", "phantom_assassin_daggers"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/phantom_assassin_persona/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "armor_persona_1",
+                    "legs_persona_1",
+                    "weapon_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/phantom_assassin/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "armor_persona_1",
+                    "legs_persona_1",
+                    "weapon_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": (
+                        "models/heroes/phantom_assassin_persona/"
+                        "phantom_assassin_persona.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/phantom_assassin/phantom_assassin.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "head_persona_1": (
+                "models/heroes/phantom_assassin/phantom_assassin_helmet.vmdl"
+            ),
+            "armor_persona_1": (
+                "models/heroes/phantom_assassin/phantom_assassin_shoulders.vmdl"
+            ),
+            "legs_persona_1": (
+                "models/heroes/phantom_assassin/phantom_assassin_cape.vmdl"
+            ),
+            "weapon_persona_1": (
+                "models/heroes/phantom_assassin/phantom_assassin_weapon.vmdl"
+            ),
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    f"models/heroes/phantom_assassin_persona/default_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[
+                    f"models/items/phantom_assassin/cosmetic_{slot}.vmdl"
+                ].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target[
+                "models/heroes/phantom_assassin_persona/"
+                "phantom_assassin_persona.vmdl"
+            ].source,
+            "models/heroes/phantom_assassin/phantom_assassin.vmdl",
+        )
+        self.assertNotIn(
+            "models/heroes/phantom_assassin/phantom_assassin_daggers.vmdl",
+            {mapping.source for mapping in plan.mappings},
+        )
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 8)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
     def test_persona_profile_reports_schema_drift_and_falls_back_conservatively(self):
         hero = "npc_dota_hero_crystal_maiden"
         fallback_defaults = (
