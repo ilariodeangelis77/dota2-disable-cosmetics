@@ -73,7 +73,7 @@ way to return supported assets to that more familiar visual language.
 | | |
 | --- | --- |
 | **🔄 Patch-aware mappings**<br />Rebuilds from the economy and unit schemas in the currently installed game. | **📦 Self-contained releases**<br />Includes Python and both compiled-resource helpers. |
-| **🎛️ Five replacement categories**<br />Choose wearables, Personas, model swaps, attachments, and effects independently. | **🧭 Update detection**<br />Records the source Dota build and reports when an override becomes stale. |
+| **🎛️ Four clear replacement choices**<br />Choose wearables, transformations, Personas, and effects without exposing internal schema categories. | **🧭 Update detection**<br />Records the source Dota build and reports when an override becomes stale. |
 | **🖥️ Dashboard and CLI**<br />Use the native desktop interface or automate the same workflow from a terminal. | **🛡️ Conservative deployment**<br />Owns one checksummed VPK and never overwrites an unrelated archive. |
 
 ## Requirements
@@ -123,18 +123,18 @@ dashboard open while a build or cleanup is running.
 
 | Category | Current coverage |
 | --- | --- |
-| Standard wearables | Normal and alternate-style `model_player` resources, integrated-slot items, and bodygroup-sensitive compatibility models. |
-| Persona models | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. |
-| Hero and model swaps | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, and model-to-model rules for heroes, summons, wards, transformations, and similar units. |
-| Additional attachments | `additional_wearable` resources, supported pets, and pickup props. |
+| Wearables and attachments | Normal and alternate-style `model_player` resources, integrated-slot items, bodygroup-sensitive compatibility models, and `additional_wearable` attachments. |
+| Hero transformations | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, model-to-model, pet, summon, ward, and similar special-model rules. |
+| Personas — experimental | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. This remains independently selectable because its coverage has more known edge cases. |
 | Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, and particle snapshots. |
 
 Where applicable, selected model categories also restore confidently matched material variants and
 add compatible base-material groups to copied default models.
 
 Mappings are derived from schema mechanics rather than cosmetic names. Some Arcana parts therefore
-belong to **Standard wearables**, while a transformation and its related attachments remain together
-under **Hero and model swaps** or **Persona models**.
+belong to **Wearables and attachments**, while a transformation and its related attachments remain
+together under **Hero transformations** or **Personas**. The dashboard groups five internal planner
+categories into these four user-facing choices; the CLI retains the detailed category names.
 
 ### Known limitations
 

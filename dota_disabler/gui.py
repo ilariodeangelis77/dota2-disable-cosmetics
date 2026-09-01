@@ -33,7 +33,6 @@ from .gui_model import (
     LANGUAGE_LABEL_TO_CODE,
     LANGUAGE_NAMES,
     MUTED,
-    PLANNED_FEATURES,
     RED,
     SETTINGS_FILENAME,
     SETTINGS_FORMAT_VERSION,
@@ -193,9 +192,15 @@ class DisablerApp:
         self.settings = load_ui_settings()
         self.path_var = tk.StringVar(value=self.settings.get("dota_path") or "")
         self.language_var = tk.StringVar(value=language_label(self.settings["language"]))
+        enabled_categories = set(self.settings["enabled_categories"])
         self.category_vars = {
-            feature["category"]: tk.BooleanVar(
-                value=feature["category"] in self.settings["enabled_categories"]
+            feature["key"]: tk.BooleanVar(
+                # Grouped UI choices preserve any previously enabled internal
+                # category and become atomic the next time settings are saved.
+                value=any(
+                    category in enabled_categories
+                    for category in feature["categories"]
+                )
             )
             for feature in FEATURES
         }
@@ -419,7 +424,7 @@ class DisablerApp:
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_columnconfigure(1, weight=1)
 
-        tk.Label(panel, text="WHAT TO REPLACE", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)).grid(
+        tk.Label(panel, text="COSMETICS TO DISABLE", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)).grid(
             row=0, column=0, sticky="w", padx=20, pady=(18, 4)
         )
         presets = tk.Frame(panel, bg=SURFACE)
@@ -441,7 +446,7 @@ class DisablerApp:
         self.busy_controls.extend((select_all, clear))
         tk.Label(
             panel,
-            text="Build selection  ·  applied on next build",
+            text="Restore selected categories to their defaults on the next build",
             bg=SURFACE,
             fg=TEXT,
             font=("Segoe UI Semibold", 14),
@@ -449,44 +454,42 @@ class DisablerApp:
 
         supported = tk.Frame(panel, bg=SURFACE)
         supported.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=(10, 8))
-        for column in range(len(FEATURES)):
+        feature_columns = 2
+        for column in range(feature_columns):
             supported.grid_columnconfigure(column, weight=1, uniform="feature")
         for index, feature in enumerate(FEATURES):
-            self._build_feature_card(supported, feature, 0, index)
-
-        tk.Label(panel, text="NEXT CATEGORIES", bg=SURFACE, fg=MUTED, font=("Segoe UI Semibold", 9)).grid(
-            row=3, column=0, columnspan=2, sticky="w", padx=20, pady=(3, 7)
-        )
-        planned = tk.Frame(panel, bg=SURFACE)
-        planned.grid(row=4, column=0, columnspan=2, sticky="ew", padx=14)
-        for column in range(len(PLANNED_FEATURES)):
-            planned.grid_columnconfigure(column, weight=1, uniform="planned")
-        for index, (title, description) in enumerate(PLANNED_FEATURES):
-            self._build_planned_card(planned, title, description, 0, index)
+            row, column = divmod(index, feature_columns)
+            supported.grid_rowconfigure(row, weight=1, uniform="feature")
+            self._build_feature_card(supported, feature, row, column)
 
         tk.Label(
             panel,
-            text="Categories follow schema rules—not cosmetic names. Sounds, icons, and animations remain unchanged.",
+            text=(
+                "Categories follow schema rules—not cosmetic names. Sounds, icons, animations, "
+                "couriers, and world cosmetics remain unchanged."
+            ),
             bg=SURFACE,
             fg=MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-        ).grid(row=5, column=0, columnspan=2, sticky="ew", padx=20, pady=(8, 14))
+            justify="left",
+            wraplength=520,
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", padx=20, pady=(5, 14))
 
     def _build_feature_card(self, parent: tk.Frame, feature: dict, row: int, column: int) -> None:
         card = tk.Frame(parent, bg=SURFACE_ALT, highlightbackground=BORDER_SOFT, highlightthickness=1)
-        card.grid(row=row, column=column, sticky="new", padx=5, pady=5)
+        card.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
         card.grid_columnconfigure(0, weight=1)
         tk.Label(
             card,
             text=feature["tag"],
             bg=SURFACE_ALT,
-            fg=GREEN,
+            fg=AMBER if feature["tag"] == "EXPERIMENTAL" else GREEN,
             font=("Segoe UI Semibold", 7),
         ).grid(row=0, column=0, sticky="w", padx=11, pady=(8, 2))
         toggle = ToggleSwitch(
             card,
-            self.category_vars[feature["category"]],
+            self.category_vars[feature["key"]],
             self._category_changed,
         )
         toggle.grid(row=0, column=1, sticky="e", padx=9, pady=(5, 0))
@@ -496,9 +499,9 @@ class DisablerApp:
             text=feature["title"],
             bg=SURFACE_ALT,
             fg=TEXT,
-            font=("Segoe UI Semibold", 9),
+            font=("Segoe UI Semibold", 10),
             justify="left",
-            wraplength=145,
+            wraplength=230,
         ).grid(row=1, column=0, columnspan=2, sticky="w", padx=12, pady=(1, 1))
         tk.Label(
             card,
@@ -507,45 +510,9 @@ class DisablerApp:
             fg=TEXT_SOFT,
             justify="left",
             anchor="nw",
-            wraplength=145,
-            font=("Segoe UI", 8),
+            wraplength=230,
+            font=("Segoe UI", 9),
         ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(1, 9))
-
-    def _build_planned_card(self, parent: tk.Frame, title: str, description: str, row: int, column: int) -> None:
-        card = tk.Frame(parent, bg="#101720", highlightbackground=BORDER_SOFT, highlightthickness=1)
-        card.grid(row=row, column=column, sticky="new", padx=5, pady=4)
-        card.grid_columnconfigure(0, weight=1)
-        tk.Label(
-            card,
-            text="PLANNED",
-            bg=BORDER_SOFT,
-            fg=MUTED,
-            font=("Segoe UI Semibold", 7),
-            padx=5,
-            pady=2,
-        ).grid(row=0, column=0, sticky="w", padx=10, pady=(7, 2))
-        planned_switch = ToggleSwitch(card, tk.BooleanVar(value=False), lambda: None)
-        planned_switch.set_enabled(False)
-        planned_switch.grid(row=0, column=1, sticky="e", padx=9, pady=(5, 0))
-        tk.Label(
-            card,
-            text=title,
-            bg="#101720",
-            fg=TEXT_SOFT,
-            font=("Segoe UI Semibold", 9),
-            justify="left",
-            wraplength=145,
-        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=12, pady=(1, 1))
-        tk.Label(
-            card,
-            text=description,
-            bg="#101720",
-            fg=MUTED,
-            justify="left",
-            anchor="nw",
-            wraplength=145,
-            font=("Segoe UI", 8),
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(1, 8))
 
     def _build_activity_panel(self) -> None:
         border, panel = _card(self.root)
@@ -621,14 +588,19 @@ class DisablerApp:
         self._append_log("Ready. Dota will be detected automatically.")
 
     def _selected_categories(self) -> set[str]:
-        return {category for category, variable in self.category_vars.items() if variable.get()}
+        return {
+            category
+            for feature in FEATURES
+            if self.category_vars[feature["key"]].get()
+            for category in feature["categories"]
+        }
 
     def _selected_language(self) -> str:
         return LANGUAGE_LABEL_TO_CODE.get(self.language_var.get(), engine.DEFAULT_LANGUAGE)
 
     def _category_changed(self) -> None:
         self._save_preferences()
-        selected = len(self._selected_categories())
+        selected = sum(variable.get() for variable in self.category_vars.values())
         self._append_log(f"Selected {selected} of {len(FEATURES)} supported replacement categories.")
         if self.last_status is not None and status_matches_path(self.last_status, self.path_var.get()):
             self._apply_status(self.last_status)

@@ -1445,12 +1445,36 @@ class GuiViewModelTests(unittest.TestCase):
         )
         self.assertEqual(stale_with_selection_changes["badge"], "UPDATE FOUND")
 
-    def test_feature_tiles_distinguish_supported_from_planned(self):
+    def test_feature_tiles_group_internal_categories_without_hiding_personas(self):
         self.assertEqual(
-            {feature["category"] for feature in disabler_gui.FEATURES},
+            {
+                category
+                for feature in disabler_gui.FEATURES
+                for category in feature["categories"]
+            },
             generator.DEFAULT_CATEGORIES,
         )
-        self.assertTrue(disabler_gui.PLANNED_FEATURES)
+        self.assertEqual(len(disabler_gui.FEATURES), 4)
+        wearables = next(
+            feature
+            for feature in disabler_gui.FEATURES
+            if feature["key"] == "wearables_attachments"
+        )
+        self.assertEqual(
+            set(wearables["categories"]),
+            {
+                generator.CATEGORY_STANDARD_WEARABLES,
+                generator.CATEGORY_ADDITIONAL_WEARABLES,
+            },
+        )
+        personas = next(
+            feature
+            for feature in disabler_gui.FEATURES
+            if feature["key"] == "persona_models"
+        )
+        self.assertEqual(personas["categories"], (generator.CATEGORY_PERSONA_MODELS,))
+        self.assertEqual(personas["tag"], "EXPERIMENTAL")
+        self.assertFalse(hasattr(disabler_gui, "PLANNED_FEATURES"))
 
     def test_status_is_only_reused_for_the_same_path(self):
         result = {"dota_path": str(Path("D:/Steam/dota 2 beta"))}

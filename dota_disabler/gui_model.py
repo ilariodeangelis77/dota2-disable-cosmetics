@@ -77,41 +77,36 @@ LANGUAGE_LABELS = tuple(LANGUAGE_LABEL_TO_CODE)
 
 FEATURES = (
     {
-        "category": engine.CATEGORY_STANDARD_WEARABLES,
-        "title": "Standard wearables",
-        "description": "Ordinary model fields and styles; some Arcana pieces can use these rules.",
+        "key": "wearables_attachments",
+        "categories": (
+            engine.CATEGORY_STANDARD_WEARABLES,
+            engine.CATEGORY_ADDITIONAL_WEARABLES,
+        ),
+        "title": "Wearables & attachments",
+        "description": "Restore equipped items, styles, materials, and extra model attachments.",
         "tag": "SUPPORTED",
     },
     {
-        "category": engine.CATEGORY_SPECIAL_MODELS,
-        "title": "Hero & model swaps",
-        "description": "Schema-defined transformations, including many—but not all—Arcana structures.",
+        "key": "hero_transformations",
+        "categories": (engine.CATEGORY_SPECIAL_MODELS,),
+        "title": "Hero transformations",
+        "description": "Restore special model swaps, transformations, pets, summons, and similar units.",
         "tag": "SUPPORTED",
     },
     {
-        "category": engine.CATEGORY_PERSONA_MODELS,
-        "title": "Persona models",
-        "description": "Conservatively restore or hide models attached to Persona slots.",
-        "tag": "SUPPORTED",
+        "key": "persona_models",
+        "categories": (engine.CATEGORY_PERSONA_MODELS,),
+        "title": "Personas",
+        "description": "Restore Persona-specific models separately; this coverage is still experimental.",
+        "tag": "EXPERIMENTAL",
     },
     {
-        "category": engine.CATEGORY_ADDITIONAL_WEARABLES,
-        "title": "Standalone attachments",
-        "description": "Extra attachments on ordinary items; Persona/special extras follow their parent.",
-        "tag": "SUPPORTED",
-    },
-    {
-        "category": engine.CATEGORY_PARTICLE_EFFECTS,
+        "key": "particle_effects",
+        "categories": (engine.CATEGORY_PARTICLE_EFFECTS,),
         "title": "Particles & effects",
         "description": "Restore mapped defaults and hide additive effects in cosmetic namespaces.",
         "tag": "SUPPORTED",
     },
-)
-
-PLANNED_FEATURES = (
-    ("Animation & audio", "Default activities, voices, and cosmetic sounds."),
-    ("Icons & UI", "Portraits, abilities, and presentation assets."),
-    ("Couriers & world", "Auxiliary units and optional map cosmetics."),
 )
 
 
@@ -282,7 +277,6 @@ __all__ = [
     "LANGUAGE_LABEL_TO_CODE",
     "LANGUAGE_NAMES",
     "MUTED",
-    "PLANNED_FEATURES",
     "RED",
     "SETTINGS_FILENAME",
     "SETTINGS_FORMAT_VERSION",
