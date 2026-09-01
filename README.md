@@ -31,7 +31,7 @@
   <img src="docs/images/dashboard.png" alt="Dota 2 Cosmetic Disabler desktop dashboard" width="100%" />
 </p>
 
-<p align="center"><sub>The dashboard showing installation detection, category selection, and Dota build status.</sub></p>
+<p align="center"><sub>The dashboard showing stacked setup controls beside the persistent activity log.</sub></p>
 
 > [!IMPORTANT]
 > This project is in beta. It has passed automated, packaged, and live-install schema validation,
@@ -111,11 +111,12 @@ The dashboard can:
 - Detect a Dota installation or accept a manually selected path.
 - Show the installed Dota build, the build used by the current overrides, and their status.
 - Select a recognized language mount and any combination of supported categories.
-- Review the current category and language selection in a full-width build summary before starting;
-  cleanup remains available there as a secondary maintenance action.
+- Review the current category and language selection directly below the category toggles before
+  starting; cleanup remains available there as a secondary maintenance action.
 - Build and clean in the background while displaying real item, resource, model, material,
   particle, and per-file progress on a determinate bar with `0.1%` display precision.
-- Keep the latest activity visible in a compact summary or expand the timestamped activity history.
+- Keep the complete timestamped activity history visible in a full-height log beside the setup
+  controls.
 - Open generated reports and output folders, or copy the required Steam launch option, after a
   usable override result is available.
 
