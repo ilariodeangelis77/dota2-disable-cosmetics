@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import disable_cosmetics as generator
 import disabler_gui
+from dota_disabler import model_patcher
 
 
 HERO = "npc_dota_hero_test"
@@ -1487,6 +1488,37 @@ class GuiViewModelTests(unittest.TestCase):
             status, error = disabler_gui.try_get_status(dota, "finnish")
         self.assertIsNone(status)
         self.assertIsInstance(error, generator.UnsafeOutputError)
+
+
+class ModelPatcherDiscoveryTests(unittest.TestCase):
+    def test_current_model_patcher_version_is_accepted(self):
+        process = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=(
+                f"Dota2ModelSkinPatcher {model_patcher.MODEL_PATCHER_VERSION} "
+                "(ValveResourceFormat 15.0.4937)\n"
+            ),
+            stderr="",
+        )
+        with patch.object(model_patcher, "run", return_value=process):
+            model_patcher.validate_model_patcher(Path("patcher"))
+
+    def test_stale_model_patcher_version_is_rejected(self):
+        process = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="Dota2ModelSkinPatcher 0.1.0 (ValveResourceFormat 15.0.4937)\n",
+            stderr="",
+        )
+        with (
+            patch.object(model_patcher, "run", return_value=process),
+            self.assertRaisesRegex(
+                generator.GeneratorError,
+                r"Expected 0\.1\.1.*0\.1\.0",
+            ),
+        ):
+            model_patcher.validate_model_patcher(Path("patcher"))
 
 
 class PathSafetyTests(unittest.TestCase):

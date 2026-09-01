@@ -16,6 +16,9 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
+MODEL_PATCHER_VERSION = "0.1.1"
+
+
 def find_model_patcher(explicit: Optional[str] = None) -> Path:
     executable_name = (
         "Dota2ModelSkinPatcher.exe" if os.name == "nt" else "Dota2ModelSkinPatcher"
@@ -55,7 +58,16 @@ def find_model_patcher(explicit: Optional[str] = None) -> Path:
 
 
 def validate_model_patcher(patcher: Path) -> None:
-    run([str(patcher), "--version"], quiet=True)
+    process = run([str(patcher), "--version"], quiet=True)
+    version_line = (process.stdout or "").strip()
+    expected_prefix = f"Dota2ModelSkinPatcher {MODEL_PATCHER_VERSION} "
+    if not version_line.startswith(expected_prefix):
+        reported = version_line or "no version information"
+        raise GeneratorError(
+            "The internal model skin patcher is incompatible with this application. "
+            f"Expected {MODEL_PATCHER_VERSION}, but it reported: {reported}. "
+            "Rebuild tools/ModelPatcher or use a current self-contained release."
+        )
 
 
 def patch_model_material_groups(
@@ -161,6 +173,7 @@ def patch_model_material_groups_batch(
 
 
 __all__ = [
+    "MODEL_PATCHER_VERSION",
     "find_model_patcher",
     "patch_model_material_groups",
     "patch_model_material_groups_batch",
