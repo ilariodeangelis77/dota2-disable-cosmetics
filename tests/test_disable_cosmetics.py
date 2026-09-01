@@ -550,6 +550,313 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
         self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
 
+    def test_pudge_persona_uses_reviewed_normal_wearable_slots(self):
+        hero = "npc_dota_hero_pudge"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/pudge/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("weapon", "righthook"),
+                    ("offhand_weapon", "leftweapon"),
+                    ("head", "hair"),
+                    ("shoulder", "leftarm"),
+                    ("back", "back"),
+                    ("arms", "bracer"),
+                    ("belt", "belt"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/pudge_cute/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "weapon_persona_1",
+                    "offhand_weapon_persona_1",
+                    "head_persona_1",
+                    "arms_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/pudge_cute/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "weapon_persona_1",
+                    "offhand_weapon_persona_1",
+                    "head_persona_1",
+                    "arms_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": "models/heroes/pudge_cute/pudge_cute.vmdl",
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/pudge/pudge.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "weapon_persona_1": "models/heroes/pudge/righthook.vmdl",
+            "offhand_weapon_persona_1": "models/heroes/pudge/leftweapon.vmdl",
+            "head_persona_1": "models/heroes/pudge/hair.vmdl",
+            "arms_persona_1": "models/heroes/pudge/leftarm.vmdl",
+            "armor_persona_1": "models/heroes/pudge/back.vmdl",
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[f"models/heroes/pudge_cute/default_{slot}.vmdl"].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[f"models/items/pudge_cute/cosmetic_{slot}.vmdl"].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target["models/heroes/pudge_cute/pudge_cute.vmdl"].source,
+            "models/heroes/pudge/pudge.vmdl",
+        )
+        mapping_sources = {mapping.source for mapping in plan.mappings}
+        self.assertNotIn("models/heroes/pudge/bracer.vmdl", mapping_sources)
+        self.assertNotIn("models/heroes/pudge/belt.vmdl", mapping_sources)
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 10)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 5)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
+    def test_dragon_knight_persona_restores_human_slots_and_dragon_form(self):
+        hero = "npc_dota_hero_dragon_knight"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/dragon_knight/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("head", "helmet"),
+                    ("weapon", "weapon"),
+                    ("offhand_weapon", "shield"),
+                    ("shoulder", "shoulders"),
+                    ("arms", "bracers"),
+                    ("back", "skirt"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=(
+                    f"models/heroes/dragon_knight_persona/default_{slot}.vmdl"
+                ),
+            )
+            for index, slot in enumerate(
+                ("head_persona_1", "weapon_persona_1", "armor_persona_1")
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/dragon_knight/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                ("head_persona_1", "weapon_persona_1", "armor_persona_1")
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": (
+                        "models/heroes/dragon_knight_persona/dk_persona_base.vmdl"
+                    ),
+                }
+            ],
+        )
+        shapeshift = item(
+            31,
+            hero=hero,
+            slot="shapeshift_persona_1",
+            baseitem="1",
+            visuals=[
+                {
+                    "type": "hero_model_change",
+                    "asset": (
+                        "models/heroes/dragon_knight/dragon_knight_dragon.vmdl"
+                    ),
+                    "modifier": (
+                        "models/heroes/dragon_knight_persona/"
+                        "dk_persona_dragon.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+                shapeshift,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/dragon_knight/dragon_knight.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "head_persona_1": "models/heroes/dragon_knight/helmet.vmdl",
+            "weapon_persona_1": "models/heroes/dragon_knight/weapon.vmdl",
+            "armor_persona_1": "models/heroes/dragon_knight/shield.vmdl",
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    "models/heroes/dragon_knight_persona/"
+                    f"default_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[f"models/items/dragon_knight/cosmetic_{slot}.vmdl"].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target[
+                "models/heroes/dragon_knight_persona/dk_persona_base.vmdl"
+            ].source,
+            "models/heroes/dragon_knight/dragon_knight.vmdl",
+        )
+        self.assertEqual(
+            by_target[
+                "models/heroes/dragon_knight_persona/dk_persona_dragon.vmdl"
+            ].source,
+            "models/heroes/dragon_knight/dragon_knight_dragon.vmdl",
+        )
+        mapping_sources = {mapping.source for mapping in plan.mappings}
+        self.assertNotIn("models/heroes/dragon_knight/shoulders.vmdl", mapping_sources)
+        self.assertNotIn("models/heroes/dragon_knight/bracers.vmdl", mapping_sources)
+        self.assertNotIn("models/heroes/dragon_knight/skirt.vmdl", mapping_sources)
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 6)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
+    def test_dragon_knight_profile_reports_missing_reviewed_dragon_form(self):
+        hero = "npc_dota_hero_dragon_knight"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/dragon_knight/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("head", "helmet"),
+                    ("weapon", "weapon"),
+                    ("offhand_weapon", "shield"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=(
+                    f"models/heroes/dragon_knight_persona/default_{slot}.vmdl"
+                ),
+            )
+            for index, slot in enumerate(
+                ("head_persona_1", "weapon_persona_1", "armor_persona_1")
+            )
+        )
+        records = {
+            record.item_id: record
+            for record in (*normal_defaults, *persona_defaults)
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/dragon_knight/dragon_knight.vmdl"},
+            [],
+        )
+
+        profile_issues = [
+            issue for issue in plan.unresolved if issue["type"] == "persona_profile"
+        ]
+        self.assertEqual(len(profile_issues), 1)
+        self.assertEqual(profile_issues[0]["slot"], "shapeshift_persona_1")
+        self.assertIn("model-changing rule", profile_issues[0]["reason"])
+        self.assertEqual(plan.stats["persona_profiles_validated"], 0)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 1)
+
     def test_persona_profile_reports_schema_drift_and_falls_back_conservatively(self):
         hero = "npc_dota_hero_crystal_maiden"
         fallback_defaults = (

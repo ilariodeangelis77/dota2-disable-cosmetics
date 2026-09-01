@@ -271,6 +271,16 @@ class PlanningContext:
         profile = PERSONA_PROFILES.get(hero)
         return bool(profile and profile.fallback_slot_for(slot))
 
+    @staticmethod
+    def has_reviewed_persona_base_visual_slot(
+        hero: Optional[str],
+        slot: str,
+    ) -> bool:
+        if not hero:
+            return False
+        profile = PERSONA_PROFILES.get(hero)
+        return bool(profile and slot in profile.base_visual_slots)
+
     def validate_persona_profiles(self) -> None:
         if CATEGORY_PERSONA_MODELS not in self.enabled:
             return
@@ -279,6 +289,23 @@ class PlanningContext:
             (item.hero, item_attr(item, self.prefabs, "item_slot"))
             for item in self.items.values()
             if item.hero and (item.top_models or item.nested_models)
+        }
+        modeled_base_visual_slots = {
+            (item.hero, item_attr(item, self.prefabs, "item_slot"))
+            for item in self.items.values()
+            if item.hero
+            and item_attr(item, self.prefabs, "baseitem") == "1"
+            and any(
+                visual.get("type")
+                in {
+                    "entity_model",
+                    "base_model",
+                    "entity_clientside_model",
+                    "hero_model_change",
+                }
+                and looks_like_model(visual.get("modifier", ""))
+                for visual in item.visuals
+            )
         }
         for profile in PERSONA_PROFILES.values():
             if profile.hero not in self.hero_models:
@@ -307,6 +334,26 @@ class PlanningContext:
                         "type": "persona_profile",
                         "fallback_slot": fallback_slot,
                         "reason": reason,
+                    }
+                )
+            for persona_slot in profile.base_visual_slots:
+                if (profile.hero, persona_slot) in modeled_base_visual_slots:
+                    self.increment("persona_profile_slots_resolved")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_profile_slots_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": persona_slot,
+                        "type": "persona_profile",
+                        "fallback_slot": None,
+                        "reason": (
+                            "reviewed Persona base visual slot has no current "
+                            "model-changing rule"
+                        ),
                     }
                 )
             if profile_valid:

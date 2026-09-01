@@ -12,6 +12,7 @@ class PersonaProfile:
 
     hero: str
     slot_fallbacks: tuple[tuple[str, str], ...]
+    base_visual_slots: tuple[str, ...] = ()
 
     def fallback_slot_for(self, persona_slot: str) -> Optional[str]:
         return next(
@@ -50,6 +51,32 @@ PERSONA_PROFILES = {
                 ("legs_persona_1", "back"),
                 ("weapon_persona_1", "weapon"),
             ),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_pudge",
+            # The Toy Butcher has five wearable slots while normal Pudge has
+            # seven. Keep both weapons, his hair, the structural left arm, and
+            # the large back/apron piece; omit the smaller bracer and belt.
+            slot_fallbacks=(
+                ("weapon_persona_1", "weapon"),
+                ("offhand_weapon_persona_1", "offhand_weapon"),
+                ("head_persona_1", "head"),
+                ("arms_persona_1", "shoulder"),
+                ("armor_persona_1", "back"),
+            ),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_dragon_knight",
+            # Davion exposes only three wearable slots. Preserve the helmet,
+            # sword, and shield needed for his silhouette and combat poses;
+            # omit the pauldrons, bracers, and skirt. The reviewed shapeshift
+            # visual also restores the normal Elder Dragon model.
+            slot_fallbacks=(
+                ("head_persona_1", "head"),
+                ("weapon_persona_1", "weapon"),
+                ("armor_persona_1", "offhand_weapon"),
+            ),
+            base_visual_slots=("shapeshift_persona_1",),
         ),
     )
 }

@@ -318,6 +318,15 @@ def process_item_models(
     state = context.state_for(item)
     _add_wearable_models(context, state)
     if state.is_base:
+        if context.has_reviewed_persona_base_visual_slot(state.hero, state.slot):
+            for visual in item.visuals:
+                _add_entity_or_refit(
+                    context,
+                    state,
+                    visual.get("type", ""),
+                    visual.get("asset", ""),
+                    visual.get("modifier", ""),
+                )
         return state
 
     additional_index = 0
