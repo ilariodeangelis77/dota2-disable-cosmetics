@@ -288,6 +288,135 @@ class MappingTests(unittest.TestCase):
             generator.CATEGORY_PERSONA_MODELS,
         )
 
+    def test_crystal_maiden_persona_uses_reviewed_human_wearable_slots(self):
+        hero = "npc_dota_hero_crystal_maiden"
+        human_defaults = (
+            item(
+                1,
+                hero=hero,
+                slot="head",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/head_item.vmdl",
+            ),
+            item(
+                2,
+                hero=hero,
+                slot="back",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_cape.vmdl",
+            ),
+            item(
+                3,
+                hero=hero,
+                slot="shoulder",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_shoulders.vmdl",
+            ),
+            item(
+                4,
+                hero=hero,
+                slot="weapon",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_staff.vmdl",
+            ),
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/crystal_maiden_persona/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "armor_persona_1",
+                    "misc_persona_1",
+                    "tail_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/crystal_maiden/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "armor_persona_1",
+                    "misc_persona_1",
+                    "tail_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": (
+                        "models/heroes/crystal_maiden_persona/"
+                        "crystal_maiden_persona.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *human_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/crystal_maiden/crystal_maiden.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "head_persona_1": "models/heroes/crystal_maiden/head_item.vmdl",
+            "armor_persona_1": (
+                "models/heroes/crystal_maiden/crystal_maiden_cape.vmdl"
+            ),
+            "misc_persona_1": (
+                "models/heroes/crystal_maiden/crystal_maiden_shoulders.vmdl"
+            ),
+            "tail_persona_1": (
+                "models/heroes/crystal_maiden/crystal_maiden_staff.vmdl"
+            ),
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    f"models/heroes/crystal_maiden_persona/default_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[f"models/items/crystal_maiden/cosmetic_{slot}.vmdl"].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target[
+                "models/heroes/crystal_maiden_persona/crystal_maiden_persona.vmdl"
+            ].source,
+            "models/heroes/crystal_maiden/crystal_maiden.vmdl",
+        )
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 8)
+
     def test_missing_slot_default_is_reported_instead_of_hidden(self):
         cosmetic = item(5, slot="weapon", model="models/items/test/weapon.vmdl")
         plan = generator.build_plan({}, {cosmetic.item_id: cosmetic}, {HERO: "models/heroes/test/test.vmdl"}, [])

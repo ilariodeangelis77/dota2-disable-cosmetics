@@ -325,8 +325,11 @@ missing final source resources:
 An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
 recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
 `0.9.0-beta.2` mapping, skin-material, and desktop progress changes have structural coverage but
-still require another representative in-game visual pass. These results must not be interpreted as
-proof that every cosmetic works with the current live game.
+still require another representative in-game visual pass. On 2026-09-01, a refreshed all-category
+build for Steam build `25002408` restored Crystal Maiden's wolf Persona with its human hair, cape,
+shoulders, staff, and correct-looking stance; that specific Persona was confirmed in the live
+client. These results must not be interpreted as proof that every cosmetic or Persona works with
+the current live game.
 
 ## Development
 

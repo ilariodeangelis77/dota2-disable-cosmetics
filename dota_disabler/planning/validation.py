@@ -102,6 +102,9 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         "full_hero_wearable_fallbacks": counters[
             "full_hero_wearable_fallbacks"
         ],
+        "persona_slot_defaults_restored": counters[
+            "persona_slot_defaults_restored"
+        ],
         "alternate_skin_models_skipped": counters["alternate_skin_models_skipped"],
         "entity_default_replacements": counters["entity_default_replacements"],
         "pet_models_hidden": counters["pet_models_hidden"],

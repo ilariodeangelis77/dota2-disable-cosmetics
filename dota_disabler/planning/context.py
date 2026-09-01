@@ -16,6 +16,7 @@ from ..constants import (
     INVISIBLE_MODEL,
     NEUTRAL_PARTICLE,
     PARTICLE_DEFAULT_PATH_EXCEPTIONS,
+    PERSONA_SLOT_FALLBACK_SLOTS,
     RESOURCE_MATERIAL,
     RESOURCE_MODEL,
     RESOURCE_PARTICLE,
@@ -52,6 +53,7 @@ COUNTER_NAMES = (
     "particle_reviewed_default_fallbacks",
     "bodygroup_hero_fallbacks",
     "full_hero_wearable_fallbacks",
+    "persona_slot_defaults_restored",
     "pet_models_hidden",
     "retired_items_skipped",
     "model_asset_defaults_inferred",
@@ -242,6 +244,19 @@ class PlanningContext:
             return None
         by_key = dict(default_item.top_models)
         return by_key.get(key) or by_key.get("model_player")
+
+    def reviewed_persona_model_for(
+        self,
+        hero: Optional[str],
+        slot: str,
+        key: str = "model_player",
+    ) -> Optional[str]:
+        if not hero:
+            return None
+        fallback_slot = PERSONA_SLOT_FALLBACK_SLOTS.get((hero, slot))
+        if not fallback_slot:
+            return None
+        return self.default_model_for(self.defaults.get((hero, fallback_slot)), key)
 
     def default_entity_model_for(self, asset: str) -> Optional[str]:
         direct = self.entity_defaults.get(asset)

@@ -21,21 +21,26 @@ def _wearable_source(
     *,
     model_key: str = "model_player",
     has_bodygroup_rules: bool,
-) -> tuple[str | None, bool]:
+) -> tuple[str | None, bool, bool]:
     full_hero_fallback = (
         has_bodygroup_rules
         or state.item.item_id in FULL_HERO_WEARABLE_ITEMS
         or (state.hero, state.slot) in FULL_HERO_INTEGRATED_SLOTS
     ) and not state.persona_slot
+    reviewed_persona_source = context.reviewed_persona_model_for(
+        state.hero,
+        state.slot,
+        model_key,
+    )
     source = (
-        INVISIBLE_MODEL
+        reviewed_persona_source or INVISIBLE_MODEL
         if state.persona_slot
         else context.hero_models.get(state.hero)
         if full_hero_fallback
         else context.default_model_for(state.default_item, model_key)
         or (INVISIBLE_MODEL if state.default_item is not None else None)
     )
-    return source, full_hero_fallback
+    return source, full_hero_fallback, reviewed_persona_source is not None
 
 
 def _record_wearable_fallback(
@@ -45,8 +50,11 @@ def _record_wearable_fallback(
     *,
     has_bodygroup_rules: bool,
     full_hero_fallback: bool,
+    reviewed_persona_fallback: bool,
 ) -> None:
-    if has_bodygroup_rules and full_hero_fallback:
+    if reviewed_persona_fallback:
+        context.increment("persona_slot_defaults_restored")
+    elif has_bodygroup_rules and full_hero_fallback:
         context.increment("bodygroup_hero_fallbacks")
     elif full_hero_fallback:
         context.increment("full_hero_wearable_fallbacks")
@@ -60,8 +68,17 @@ def _wearable_reason(
     *,
     has_bodygroup_rules: bool,
     full_hero_fallback: bool,
+    reviewed_persona_fallback: bool,
     style: bool,
 ) -> str:
+    if reviewed_persona_fallback:
+        if state.is_base:
+            return "persona default wearable replaced with reviewed hero slot default"
+        return (
+            "persona style replaced with reviewed hero slot default"
+            if style
+            else "persona wearable replaced with reviewed hero slot default"
+        )
     if state.persona_slot:
         return "persona style hidden" if style else "persona wearable hidden"
     if has_bodygroup_rules and full_hero_fallback:
@@ -85,14 +102,16 @@ def _add_wearable_models(
     context: PlanningContext,
     state: ItemPlanningState,
 ) -> None:
-    if state.is_base or not state.hero:
+    if not state.hero:
+        return
+    if state.is_base and context.reviewed_persona_model_for(state.hero, state.slot) is None:
         return
     has_bodygroup_rules = any(
         visual.get("type") == "bodygroup_visibility" for visual in state.item.visuals
     )
 
     for key, cosmetic_model in state.item.top_models:
-        source, full_hero_fallback = _wearable_source(
+        source, full_hero_fallback, reviewed_persona_fallback = _wearable_source(
             context,
             state,
             model_key=key,
@@ -105,6 +124,7 @@ def _add_wearable_models(
                 source,
                 has_bodygroup_rules=has_bodygroup_rules,
                 full_hero_fallback=full_hero_fallback,
+                reviewed_persona_fallback=reviewed_persona_fallback,
             )
             context.remember_default_source(cosmetic_model, source)
             context.add_candidate(
@@ -115,6 +135,7 @@ def _add_wearable_models(
                     source,
                     has_bodygroup_rules=has_bodygroup_rules,
                     full_hero_fallback=full_hero_fallback,
+                    reviewed_persona_fallback=reviewed_persona_fallback,
                     style=False,
                 ),
                 state.item,
@@ -134,7 +155,7 @@ def _add_wearable_models(
             )
 
     for _key, cosmetic_model in state.item.nested_models:
-        source, full_hero_fallback = _wearable_source(
+        source, full_hero_fallback, reviewed_persona_fallback = _wearable_source(
             context,
             state,
             has_bodygroup_rules=has_bodygroup_rules,
@@ -146,6 +167,7 @@ def _add_wearable_models(
                 source,
                 has_bodygroup_rules=has_bodygroup_rules,
                 full_hero_fallback=full_hero_fallback,
+                reviewed_persona_fallback=reviewed_persona_fallback,
             )
             context.remember_default_source(cosmetic_model, source)
             context.add_candidate(
@@ -156,6 +178,7 @@ def _add_wearable_models(
                     source,
                     has_bodygroup_rules=has_bodygroup_rules,
                     full_hero_fallback=full_hero_fallback,
+                    reviewed_persona_fallback=reviewed_persona_fallback,
                     style=True,
                 ),
                 state.item,
