@@ -64,16 +64,6 @@ MODEL_KEYS = ("model_player", "model_player1", "model_player2", "model_player3",
 # ordinary wearable or need a skeleton-compatible full-hero replacement.
 FULL_HERO_WEARABLE_ITEMS = frozenset({"34398"})  # Madame Scrio (Io)
 FULL_HERO_INTEGRATED_SLOTS = frozenset({("npc_dota_hero_witch_doctor", "back")})
-# Reviewed Persona-to-base slot bridges. Crystal Maiden's wolf Persona has four
-# wearable slots while the human hero has five; use those slots for the four
-# pieces that restore her silhouette and make her staff-holding animations read
-# correctly. The comparatively small cuffs are the one base piece left out.
-PERSONA_SLOT_FALLBACK_SLOTS = {
-    ("npc_dota_hero_crystal_maiden", "head_persona_1"): "head",
-    ("npc_dota_hero_crystal_maiden", "armor_persona_1"): "back",
-    ("npc_dota_hero_crystal_maiden", "misc_persona_1"): "shoulder",
-    ("npc_dota_hero_crystal_maiden", "tail_persona_1"): "weapon",
-}
 RETIRED_ITEM_NAME_MARKERS = (" expired",)
 
 CATEGORY_STANDARD_WEARABLES = "standard_wearables"

@@ -16,7 +16,6 @@ from ..constants import (
     INVISIBLE_MODEL,
     NEUTRAL_PARTICLE,
     PARTICLE_DEFAULT_PATH_EXCEPTIONS,
-    PERSONA_SLOT_FALLBACK_SLOTS,
     RESOURCE_MATERIAL,
     RESOURCE_MODEL,
     RESOURCE_PARTICLE,
@@ -33,6 +32,7 @@ from ..resources import (
     looks_like_particle_snapshot,
 )
 from ..schema import item_attr
+from .personas import PERSONA_PROFILES
 
 
 COUNTER_NAMES = (
@@ -54,6 +54,9 @@ COUNTER_NAMES = (
     "bodygroup_hero_fallbacks",
     "full_hero_wearable_fallbacks",
     "persona_slot_defaults_restored",
+    "persona_profiles_validated",
+    "persona_profile_slots_resolved",
+    "persona_profile_slots_unresolved",
     "pet_models_hidden",
     "retired_items_skipped",
     "model_asset_defaults_inferred",
@@ -179,7 +182,7 @@ class PlanningContext:
                     if looks_like_particle(resource) or looks_like_particle_snapshot(resource):
                         protected_effect_resources.add(canonical(resource))
 
-        return cls(
+        context = cls(
             prefabs=prefabs,
             items=items,
             hero_models=hero_models,
@@ -192,6 +195,8 @@ class PlanningContext:
             default_created_particles=default_created_particles,
             protected_effect_resources=protected_effect_resources,
         )
+        context.validate_persona_profiles()
+        return context
 
     def increment(self, name: str, amount: int = 1) -> None:
         self.counters[name] += amount
@@ -253,10 +258,59 @@ class PlanningContext:
     ) -> Optional[str]:
         if not hero:
             return None
-        fallback_slot = PERSONA_SLOT_FALLBACK_SLOTS.get((hero, slot))
+        profile = PERSONA_PROFILES.get(hero)
+        fallback_slot = profile.fallback_slot_for(slot) if profile else None
         if not fallback_slot:
             return None
         return self.default_model_for(self.defaults.get((hero, fallback_slot)), key)
+
+    @staticmethod
+    def has_reviewed_persona_slot(hero: Optional[str], slot: str) -> bool:
+        if not hero:
+            return False
+        profile = PERSONA_PROFILES.get(hero)
+        return bool(profile and profile.fallback_slot_for(slot))
+
+    def validate_persona_profiles(self) -> None:
+        if CATEGORY_PERSONA_MODELS not in self.enabled:
+            return
+
+        modeled_slots = {
+            (item.hero, item_attr(item, self.prefabs, "item_slot"))
+            for item in self.items.values()
+            if item.hero and (item.top_models or item.nested_models)
+        }
+        for profile in PERSONA_PROFILES.values():
+            if profile.hero not in self.hero_models:
+                continue
+            profile_valid = True
+            for persona_slot, fallback_slot in profile.slot_fallbacks:
+                reason = ""
+                if (profile.hero, persona_slot) not in modeled_slots:
+                    reason = "reviewed Persona slot is absent from the current schema"
+                elif self.default_model_for(
+                    self.defaults.get((profile.hero, fallback_slot))
+                ) is None:
+                    reason = "reviewed fallback slot has no current default model"
+
+                if not reason:
+                    self.increment("persona_profile_slots_resolved")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_profile_slots_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": persona_slot,
+                        "type": "persona_profile",
+                        "fallback_slot": fallback_slot,
+                        "reason": reason,
+                    }
+                )
+            if profile_valid:
+                self.increment("persona_profiles_validated")
 
     def default_entity_model_for(self, asset: str) -> Optional[str]:
         direct = self.entity_defaults.get(asset)

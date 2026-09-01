@@ -105,6 +105,13 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         "persona_slot_defaults_restored": counters[
             "persona_slot_defaults_restored"
         ],
+        "persona_profiles_validated": counters["persona_profiles_validated"],
+        "persona_profile_slots_resolved": counters[
+            "persona_profile_slots_resolved"
+        ],
+        "persona_profile_slots_unresolved": counters[
+            "persona_profile_slots_unresolved"
+        ],
         "alternate_skin_models_skipped": counters["alternate_skin_models_skipped"],
         "entity_default_replacements": counters["entity_default_replacements"],
         "pet_models_hidden": counters["pet_models_hidden"],

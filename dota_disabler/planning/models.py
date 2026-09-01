@@ -104,7 +104,7 @@ def _add_wearable_models(
 ) -> None:
     if not state.hero:
         return
-    if state.is_base and context.reviewed_persona_model_for(state.hero, state.slot) is None:
+    if state.is_base and not context.has_reviewed_persona_slot(state.hero, state.slot):
         return
     has_bodygroup_rules = any(
         visual.get("type") == "bodygroup_visibility" for visual in state.item.visuals

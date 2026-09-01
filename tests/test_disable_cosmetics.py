@@ -416,6 +416,132 @@ class MappingTests(unittest.TestCase):
             "models/heroes/crystal_maiden/crystal_maiden.vmdl",
         )
         self.assertEqual(plan.stats["persona_slot_defaults_restored"], 8)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
+    def test_persona_profile_reports_schema_drift_and_falls_back_conservatively(self):
+        hero = "npc_dota_hero_crystal_maiden"
+        fallback_defaults = (
+            item(
+                1,
+                hero=hero,
+                slot="back",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_cape.vmdl",
+            ),
+            item(
+                2,
+                hero=hero,
+                slot="shoulder",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_shoulders.vmdl",
+            ),
+            item(
+                3,
+                hero=hero,
+                slot="weapon",
+                baseitem="1",
+                model="models/heroes/crystal_maiden/crystal_maiden_staff.vmdl",
+            ),
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/crystal_maiden_persona/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "armor_persona_1",
+                    "misc_persona_1",
+                    "tail_persona_1",
+                )
+            )
+        )
+        records = {
+            record.item_id: record
+            for record in (*fallback_defaults, *persona_defaults)
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/crystal_maiden/crystal_maiden.vmdl"},
+            [],
+        )
+
+        profile_issues = [
+            issue for issue in plan.unresolved if issue["type"] == "persona_profile"
+        ]
+        self.assertEqual(len(profile_issues), 1)
+        self.assertEqual(profile_issues[0]["slot"], "head_persona_1")
+        self.assertEqual(profile_issues[0]["fallback_slot"], "head")
+        self.assertIn("no current default model", profile_issues[0]["reason"])
+        self.assertEqual(plan.stats["persona_profiles_validated"], 0)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 1)
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        self.assertEqual(
+            by_target[
+                "models/heroes/crystal_maiden_persona/default_head_persona_1.vmdl"
+            ].source,
+            generator.INVISIBLE_MODEL,
+        )
+
+    def test_persona_profile_reports_a_removed_persona_slot(self):
+        hero = "npc_dota_hero_crystal_maiden"
+        base_models = {
+            "head": "head_item",
+            "back": "crystal_maiden_cape",
+            "shoulder": "crystal_maiden_shoulders",
+            "weapon": "crystal_maiden_staff",
+        }
+        fallback_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/crystal_maiden/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(base_models.items(), start=1)
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/crystal_maiden_persona/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                ("head_persona_1", "armor_persona_1", "misc_persona_1")
+            )
+        )
+        records = {
+            record.item_id: record
+            for record in (*fallback_defaults, *persona_defaults)
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/crystal_maiden/crystal_maiden.vmdl"},
+            [],
+        )
+
+        profile_issues = [
+            issue for issue in plan.unresolved if issue["type"] == "persona_profile"
+        ]
+        self.assertEqual(len(profile_issues), 1)
+        self.assertEqual(profile_issues[0]["slot"], "tail_persona_1")
+        self.assertIn("absent from the current schema", profile_issues[0]["reason"])
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 1)
 
     def test_missing_slot_default_is_reported_instead_of_hidden(self):
         cosmetic = item(5, slot="weapon", model="models/items/test/weapon.vmdl")
