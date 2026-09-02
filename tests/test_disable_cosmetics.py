@@ -670,6 +670,269 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
         self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
 
+    def test_morphling_automaton_hides_reviewed_persona_only_slot(self):
+        hero = "npc_dota_hero_morphling"
+        normal_arms = (
+            "models/items/morphling/emperor_of_the_sea_arms/"
+            "emperor_of_the_sea_arms.vmdl"
+        )
+        automaton_back = (
+            "models/items/morphling/morphling_automaton/"
+            "morphling_automaton_back.vmdl"
+        )
+        future_neck_style = (
+            "models/items/morphling/morphling_automaton/"
+            "future_neck_style.vmdl"
+        )
+        automaton_model = (
+            "models/items/morphling/morphling_automaton/"
+            "morphling_automaton.vmdl"
+        )
+        normal_waveform = (
+            "particles/units/heroes/hero_morphling/morphling_waveform.vpcf"
+        )
+        automaton_waveform = (
+            "particles/econ/items/morphling/morphling_dark_carnival/"
+            "morphling_dark_carnival_waveform.vpcf"
+        )
+        automaton_arms_refit = (
+            "models/items/morphling/emperor_of_the_sea_arms/"
+            "emperor_of_the_sea_arms_refit.vmdl"
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                item(1, hero=hero, slot="arms", baseitem="1"),
+                item(2, hero=hero, slot="arms", model=normal_arms),
+                item(
+                    868,
+                    hero=hero,
+                    slot="arms_persona_1",
+                    baseitem="1",
+                ),
+                item(
+                    870,
+                    hero=hero,
+                    slot="neck_persona_1",
+                    baseitem="1",
+                    model=automaton_back,
+                ),
+                item(
+                    900,
+                    hero=hero,
+                    slot="neck_persona_1",
+                    nested_models=[("model_player", future_neck_style)],
+                ),
+                item(
+                    36193,
+                    hero=hero,
+                    slot="persona_selector",
+                    visuals=[
+                        {
+                            "type": "entity_model",
+                            "asset": hero,
+                            "modifier": automaton_model,
+                        },
+                        {
+                            "type": "model",
+                            "asset": normal_arms,
+                            "modifier": automaton_arms_refit,
+                        },
+                        {
+                            "type": "particle",
+                            "asset": normal_waveform,
+                            "modifier": automaton_waveform,
+                        },
+                    ],
+                ),
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/morphling/morphling.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+
+        self.assertEqual(
+            by_target[automaton_model].source,
+            "models/heroes/morphling/morphling.vmdl",
+        )
+        self.assertEqual(by_target[automaton_back].source, generator.INVISIBLE_MODEL)
+        self.assertEqual(
+            by_target[automaton_back].reason,
+            "persona default wearable hidden by reviewed slot policy",
+        )
+        self.assertEqual(
+            by_target[future_neck_style].source,
+            generator.INVISIBLE_MODEL,
+        )
+        self.assertEqual(
+            by_target[future_neck_style].reason,
+            "persona style hidden by reviewed slot policy",
+        )
+        self.assertEqual(by_target[normal_arms].source, generator.INVISIBLE_MODEL)
+        self.assertEqual(
+            by_target[automaton_arms_refit].source,
+            generator.INVISIBLE_MODEL,
+        )
+        self.assertEqual(by_target[automaton_waveform].source, normal_waveform)
+        self.assertEqual(plan.unresolved, [])
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 0)
+        self.assertEqual(plan.stats["persona_slot_models_hidden"], 2)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
+    def test_morphling_hidden_persona_slot_reports_schema_drift(self):
+        hero = "npc_dota_hero_morphling"
+        plan = generator.build_plan(
+            {},
+            {
+                "868": item(
+                    868,
+                    hero=hero,
+                    slot="arms_persona_1",
+                    baseitem="1",
+                )
+            },
+            {hero: "models/heroes/morphling/morphling.vmdl"},
+            [],
+        )
+
+        self.assertEqual(plan.stats["persona_profiles_validated"], 0)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 0)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 1)
+        self.assertEqual(len(plan.unresolved), 1)
+        self.assertEqual(plan.unresolved[0]["slot"], "neck_persona_1")
+        self.assertIsNone(plan.unresolved[0]["fallback_slot"])
+        self.assertIn("hidden Persona slot", plan.unresolved[0]["reason"])
+
+    def test_oracle_automaton_assembles_all_normal_wearables(self):
+        hero = "npc_dota_hero_oracle"
+        normal_models = {
+            "armor": "models/heroes/oracle/armor.vmdl",
+            "back": "models/heroes/oracle/back_item.vmdl",
+            "head": "models/heroes/oracle/head_item.vmdl",
+            "weapon": "models/heroes/oracle/weapon.vmdl",
+        }
+        persona_back = (
+            "models/items/oracle/oracle_carnival/oracle_carnival_back.vmdl"
+        )
+        future_back_style = (
+            "models/items/oracle/oracle_carnival/future_back_style.vmdl"
+        )
+        persona_weapon = (
+            "models/items/oracle/oracle_carnival/oracle_carnival_weapon.vmdl"
+        )
+        persona_body = (
+            "models/items/oracle/oracle_carnival/oracle_carnival_base_body.vmdl"
+        )
+        normal_edict = "particles/units/heroes/hero_oracle/oracle_fatesedict.vpcf"
+        automaton_edict = (
+            "particles/econ/items/oracle/oracle_carnival/"
+            "oracle_carnival_fatesedict.vpcf"
+        )
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=model,
+            )
+            for index, (slot, model) in enumerate(normal_models.items(), start=1)
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                item(
+                    842,
+                    hero=hero,
+                    slot="weapon_persona_1",
+                    baseitem="1",
+                    model=persona_weapon,
+                    visuals=[
+                        {
+                            "type": "particle",
+                            "asset": normal_edict,
+                            "modifier": automaton_edict,
+                        }
+                    ],
+                ),
+                item(
+                    844,
+                    hero=hero,
+                    slot="back_persona_1",
+                    baseitem="1",
+                    model=persona_back,
+                ),
+                item(
+                    900,
+                    hero=hero,
+                    slot="back_persona_1",
+                    nested_models=[("model_player", future_back_style)],
+                ),
+                item(
+                    31357,
+                    hero=hero,
+                    slot="persona_selector",
+                    visuals=[
+                        {
+                            "type": "entity_model",
+                            "asset": hero,
+                            "modifier": persona_body,
+                        }
+                    ],
+                ),
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/oracle/oracle.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+
+        self.assertEqual(
+            by_target[persona_body].source,
+            "models/heroes/oracle/oracle.vmdl",
+        )
+        self.assertEqual(by_target[persona_weapon].source, normal_models["weapon"])
+        self.assertEqual(by_target[persona_back].source, normal_models["back"])
+        self.assertEqual(by_target[future_back_style].source, normal_models["back"])
+        self.assertEqual(by_target[automaton_edict].source, normal_edict)
+        self.assertEqual(plan.unresolved, [])
+        self.assertEqual(len(plan.model_compositions), 2)
+        self.assertEqual(
+            {composition.target for composition in plan.model_compositions},
+            {persona_back, future_back_style},
+        )
+        for composition in plan.model_compositions:
+            self.assertEqual(composition.primary_source, normal_models["back"])
+            self.assertEqual(composition.secondary_source, normal_models["armor"])
+            self.assertEqual(composition.mode, "skeleton-union")
+            self.assertEqual(
+                composition.additional_parts,
+                (
+                    generator.ModelCompositionPart(
+                        source=normal_models["head"],
+                        mode="skeleton-union",
+                    ),
+                ),
+            )
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 3)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_planned"], 2)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
+
     def test_invoker_persona_restores_adult_wearables_and_forge_spirit(self):
         hero = "npc_dota_hero_invoker"
         normal_defaults = tuple(
@@ -1387,6 +1650,7 @@ class MappingTests(unittest.TestCase):
                     "hero": composition.hero,
                     "slot": composition.slot,
                     "mode": "shared-root",
+                    "additional_parts": [],
                 }
             ],
         )
@@ -2931,6 +3195,54 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             ["--mode", "skeleton-overlay"],
         )
 
+    def test_skeleton_union_composition_accepts_partially_shared_bones(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            primary = root / "back.vmdl_c"
+            secondary = root / "armor.vmdl_c"
+            destination = root / "combined.vmdl_c"
+            primary.write_bytes(b"back")
+            secondary.write_bytes(b"armor")
+
+            def fake_run(command, *, quiet):
+                self.assertTrue(quiet)
+                destination.write_bytes(b"back and armor")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "mode": "skeleton-union",
+                            "primary_meshes": 2,
+                            "secondary_meshes": 2,
+                            "output_meshes": 4,
+                            "primary_bones": 12,
+                            "secondary_bones": 35,
+                            "shared_bones": 7,
+                            "output_bones": 40,
+                            "remapped_bone_references": 114,
+                            "output_references": 2,
+                            "output_bytes": destination.stat().st_size,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run) as run_helper:
+                model_patcher.compose_models(
+                    root / "patcher.exe",
+                    primary,
+                    secondary,
+                    destination,
+                    mode="skeleton-union",
+                    progress=lambda _message: None,
+                )
+
+        self.assertEqual(
+            run_helper.call_args.args[0][-2:],
+            ["--mode", "skeleton-union"],
+        )
+
     def test_current_model_patcher_version_is_accepted(self):
         process = subprocess.CompletedProcess(
             [],
@@ -2955,7 +3267,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.4\.0.*0\.1\.0",
+                r"Expected 0\.5\.0.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))
@@ -3276,6 +3588,111 @@ class DeploymentTests(unittest.TestCase):
                     unpacked / generator.compiled_model_path(target)
                 ).read_bytes(),
                 b"verified head and cape composite",
+            )
+
+    def test_multi_stage_composition_builds_and_cleans_intermediate_models(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        target = "models/items/test/assembled.vmdl"
+        composition = generator.ModelComposition(
+            primary_source="models/heroes/test/back.vmdl",
+            secondary_source="models/heroes/test/armor.vmdl",
+            target=target,
+            reason="reviewed three-part composition",
+            category=generator.CATEGORY_PERSONA_MODELS,
+            item_id="10",
+            hero=HERO,
+            slot="back_persona_1",
+            mode="skeleton-union",
+            additional_parts=(
+                generator.ModelCompositionPart(
+                    source="models/heroes/test/head.vmdl",
+                    mode="skeleton-union",
+                ),
+            ),
+        )
+        plan = generator.Plan(
+            mappings=[
+                generator.Mapping(
+                    source=composition.primary_source,
+                    target=target,
+                    reason="ordinary fallback",
+                    category=composition.category,
+                    item_id=composition.item_id,
+                    hero=composition.hero,
+                    slot=composition.slot,
+                )
+            ],
+            unresolved=[],
+            stats={},
+            model_compositions=[composition],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            for source_name, payload in (
+                (composition.primary_source, b"back"),
+                (composition.secondary_source, b"armor"),
+                (composition.additional_parts[0].source, b"head"),
+            ):
+                source = cache / generator.compiled_model_path(source_name)
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_bytes(payload)
+            output = root / "dota_dutch"
+            calls = []
+
+            def fake_compose(
+                _patcher,
+                primary_source,
+                secondary_source,
+                destination,
+                *,
+                mode,
+                progress,
+            ):
+                calls.append((primary_source, secondary_source, destination, mode))
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(
+                    primary_source.read_bytes() + b"+" + secondary_source.read_bytes()
+                )
+                progress("composed")
+
+            with patch(
+                "dota_disabler.deployment.compose_models",
+                side_effect=fake_compose,
+            ):
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual((copied, missing), (1, []))
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0][3], "skeleton-union")
+            self.assertEqual(calls[1][3], "skeleton-union")
+            self.assertEqual(calls[1][0], calls[0][2])
+            self.assertFalse(calls[0][2].exists())
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            unpacked = root / "unpacked-multi-composition"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                marker["resources"],
+                unpacked,
+            )
+            self.assertEqual(
+                (unpacked / generator.compiled_model_path(target)).read_bytes(),
+                b"back+armor+head",
             )
 
     def test_attachment_offset_model_is_transformed_before_vpk_packaging(self):

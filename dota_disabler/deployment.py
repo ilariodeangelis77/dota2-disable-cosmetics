@@ -277,7 +277,17 @@ def deploy_overrides(
     missing_keys: set[tuple[str, str, str]] = set()
     staged_files: list[str] = []
     patch_jobs: list[tuple[Path, Path, int]] = []
-    composition_jobs: list[tuple[Path, Path, Path, str, int, str]] = []
+    composition_jobs: list[
+        tuple[
+            Path,
+            Path,
+            tuple[tuple[Path, str], ...],
+            Path,
+            str,
+            int,
+            str,
+        ]
+    ] = []
     attachment_offset_jobs: list[
         tuple[Path, Path, str, tuple[str, ...], tuple[float, float, float]]
     ] = []
@@ -380,11 +390,26 @@ def deploy_overrides(
         secondary_relative = compiled_model_path(composition.secondary_source)
         primary_source = path_under(cache, primary_relative)
         secondary_source = path_under(cache, secondary_relative)
+        additional_sources = tuple(
+            (
+                path_under(cache, compiled_model_path(part.source)),
+                part.mode,
+            )
+            for part in composition.additional_parts
+        )
         sources_ready = True
-        for role, source_name, source_path in (
+        reviewed_sources = [
             ("primary", composition.primary_source, primary_source),
             ("secondary", composition.secondary_source, secondary_source),
-        ):
+            *(
+                (f"additional_{index}", part.source, source_path)
+                for index, (part, (source_path, _mode)) in enumerate(
+                    zip(composition.additional_parts, additional_sources),
+                    start=1,
+                )
+            ),
+        ]
+        for role, source_name, source_path in reviewed_sources:
             if source_path.is_file():
                 continue
             sources_ready = False
@@ -402,6 +427,7 @@ def deploy_overrides(
                 (
                     primary_source,
                     secondary_source,
+                    additional_sources,
                     destination,
                     target_relative,
                     required_groups_by_target.get(target_relative, 1),
@@ -488,12 +514,32 @@ def deploy_overrides(
     deployment_progress.begin("model_patch", "Preparing compiled default models")
     composition_patch_count = sum(
         required_groups > 1
-        for _primary, _secondary, _destination, _target, required_groups, _mode
+        for (
+            _primary,
+            _secondary,
+            _additional,
+            _destination,
+            _target,
+            required_groups,
+            _mode,
+        )
         in composition_jobs
+    )
+    composition_transform_count = sum(
+        1 + len(additional_sources)
+        for (
+            _primary,
+            _secondary,
+            additional_sources,
+            _destination,
+            _target,
+            _required_groups,
+            _mode,
+        ) in composition_jobs
     )
     model_work_total = (
         len(attachment_offset_jobs)
-        + len(composition_jobs)
+        + composition_transform_count
         + len(patch_jobs)
         + composition_patch_count
     )
@@ -524,14 +570,16 @@ def deploy_overrides(
             ),
         )
 
-    for index, (
+    composition_operations_completed = 0
+    for (
         primary_source,
         secondary_source,
+        additional_sources,
         destination,
         target_relative,
         required_groups,
         mode,
-    ) in enumerate(composition_jobs, start=1):
+    ) in composition_jobs:
         assert model_patcher is not None
         composition_output = destination
         if required_groups > 1:
@@ -539,29 +587,45 @@ def deploy_overrides(
                 f".{destination.stem}.composition-input{destination.suffix}"
             )
             composition_intermediates.append(composition_output)
-        compose_models(
-            model_patcher,
-            primary_source,
-            secondary_source,
-            composition_output,
-            mode=mode,
-            progress=progress,
-        )
+        current_source = primary_source
+        steps = ((secondary_source, mode), *additional_sources)
+        for step_index, (next_source, step_mode) in enumerate(steps, start=1):
+            is_final_step = step_index == len(steps)
+            step_output = composition_output
+            if not is_final_step:
+                step_output = destination.with_name(
+                    f".{destination.stem}.composition-step-{step_index}{destination.suffix}"
+                )
+                composition_intermediates.append(step_output)
+            compose_models(
+                model_patcher,
+                current_source,
+                next_source,
+                step_output,
+                mode=step_mode,
+                progress=progress,
+            )
+            current_source = step_output
+            composition_operations_completed += 1
+            deployment_progress.work(
+                "model_patch",
+                len(attachment_offset_jobs) + composition_operations_completed,
+                model_work_total,
+                (
+                    "Composing reviewed models "
+                    f"({composition_operations_completed:,} of "
+                    f"{composition_transform_count:,})"
+                ),
+            )
         if required_groups > 1:
             patch_jobs.append(
                 (composition_output, destination, required_groups)
             )
-        deployment_progress.work(
-            "model_patch",
-            len(attachment_offset_jobs) + index,
-            model_work_total,
-            f"Composing reviewed models ({index:,} of {len(composition_jobs):,})",
-        )
 
     if patch_jobs:
         assert model_patcher is not None
         completed_transformations = (
-            len(attachment_offset_jobs) + len(composition_jobs)
+            len(attachment_offset_jobs) + composition_transform_count
         )
 
         def model_patch_progress(
@@ -596,6 +660,7 @@ def deploy_overrides(
         for (
             _primary,
             _secondary,
+            _additional,
             _destination,
             target_relative,
             _required_groups,

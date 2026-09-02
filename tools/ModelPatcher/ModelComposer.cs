@@ -12,6 +12,7 @@ internal enum ModelCompositionMode
 {
     SharedRoot,
     SkeletonOverlay,
+    SkeletonUnion,
 }
 
 internal sealed record CompositionResult(
@@ -68,11 +69,14 @@ internal static class ModelComposer
         string outputPath,
         ModelCompositionMode mode)
     {
-        using var primary = ModelInput.Open(primaryPath, "primary");
+        using var primary = ModelInput.Open(
+            primaryPath,
+            "primary",
+            allowPrimaryPayload: true);
         using var secondary = ModelInput.Open(
             secondaryPath,
             "secondary",
-            allowExternalRemapping: mode == ModelCompositionMode.SkeletonOverlay,
+            allowExternalRemapping: mode != ModelCompositionMode.SharedRoot,
             requireSingleRoot: mode != ModelCompositionMode.SkeletonOverlay);
         ValidatePair(primary, secondary, mode);
 
@@ -91,7 +95,6 @@ internal static class ModelComposer
             .Concat(secondary.MeshBlocks.Select(block => new OpaqueBlock(secondary.Bytes, block)))
             .ToArray();
 
-        var primaryBlockMap = BuildOutputBlockMap(primary.MeshBlocks, 0);
         var secondaryBlockMap = BuildOutputBlockMap(
             secondary.MeshBlocks,
             primary.MeshBlocks.Count);
@@ -104,7 +107,6 @@ internal static class ModelComposer
         MergeControlData(
             primary,
             secondary,
-            primaryBlockMap,
             secondaryBlockMap);
         var references = MergeReferences(primary, secondary);
 
@@ -199,9 +201,13 @@ internal static class ModelComposer
             }
             ValidateSharedRoot(primary, secondary);
         }
-        else
+        else if (mode == ModelCompositionMode.SkeletonOverlay)
         {
             ValidateSkeletonOverlay(primary, secondary);
+        }
+        else
+        {
+            ValidateSkeletonUnion(primary, secondary);
         }
 
         var duplicateMeshName = primary.Meshes.Select(mesh => mesh.Name)
@@ -275,6 +281,49 @@ internal static class ModelComposer
             {
                 throw new InvalidDataException(
                     $"Overlay bone {name} has an incompatible bind transform.");
+            }
+        }
+    }
+
+    private static void ValidateSkeletonUnion(ModelInput primary, ModelInput secondary)
+    {
+        var primaryIndexes = primary.BoneNames
+            .Select((name, index) => (name, index))
+            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.Ordinal);
+        var secondaryIndexes = secondary.BoneNames
+            .Select((name, index) => (name, index))
+            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.Ordinal);
+        var sharedNames = primary.BoneNames
+            .Where(secondaryIndexes.ContainsKey)
+            .ToArray();
+        if (sharedNames.Length == 0
+            || !primaryIndexes.ContainsKey(secondary.RootBoneName))
+        {
+            throw new InvalidDataException(
+                "A skeleton union must attach at a shared secondary root bone.");
+        }
+
+        var primaryTransforms = BuildWorldBoneTransforms(primary);
+        var secondaryTransforms = BuildWorldBoneTransforms(secondary);
+        foreach (var name in sharedNames)
+        {
+            var primaryIndex = primaryIndexes[name];
+            var secondaryIndex = secondaryIndexes[name];
+            var primaryTransform = primaryTransforms[primaryIndex];
+            var secondaryTransform = secondaryTransforms[secondaryIndex];
+            var rotationDifference = Math.Min(
+                QuaternionDistance(primaryTransform.Rotation, secondaryTransform.Rotation),
+                QuaternionDistance(
+                    primaryTransform.Rotation,
+                    Quaternion.Negate(secondaryTransform.Rotation)));
+            if (Vector3.Distance(
+                    primaryTransform.Position,
+                    secondaryTransform.Position) > 0.1f
+                || rotationDifference > 0.001f
+                || Math.Abs(primaryTransform.Scale - secondaryTransform.Scale) > 0.001f)
+            {
+                throw new InvalidDataException(
+                    $"Shared union bone {name} has an incompatible bind transform.");
             }
         }
     }
@@ -442,7 +491,7 @@ internal static class ModelComposer
             var combinedBone = secondaryBone >= 0
                 && secondaryBone < secondaryToCombined.Length
                 ? secondaryToCombined[secondaryBone]
-                : mode == ModelCompositionMode.SkeletonOverlay
+                : mode != ModelCompositionMode.SharedRoot
                     ? secondaryBone
                     : throw new InvalidDataException(
                         $"Secondary mesh remapping references invalid bone {secondaryBone}.");
@@ -471,16 +520,9 @@ internal static class ModelComposer
     private static void MergeControlData(
         ModelInput primary,
         ModelInput secondary,
-        IReadOnlyDictionary<int, int> primaryBlockMap,
         IReadOnlyDictionary<int, int> secondaryBlockMap)
     {
         var destination = GetArray(primary.Control.Data, "embedded_meshes");
-        for (var index = 0; index < destination.Count; index++)
-        {
-            var definition = RequireObject(destination[index], "primary embedded mesh");
-            RemapMeshBlocks(definition, primaryBlockMap);
-        }
-
         var source = GetArray(secondary.Control.Data, "embedded_meshes");
         for (var index = 0; index < source.Count; index++)
         {
@@ -566,7 +608,8 @@ internal static class ModelComposer
         using var output = ModelInput.Open(
             outputPath,
             "composed output",
-            allowExternalRemapping: mode == ModelCompositionMode.SkeletonOverlay);
+            allowExternalRemapping: mode != ModelCompositionMode.SharedRoot,
+            allowPrimaryPayload: true);
         if (output.Resource.HeaderVersion != primary.Resource.HeaderVersion
             || output.Resource.Version != primary.Resource.Version)
         {
@@ -815,7 +858,8 @@ internal static class ModelComposer
             string path,
             string label,
             bool allowExternalRemapping = false,
-            bool requireSingleRoot = true)
+            bool requireSingleRoot = true,
+            bool allowPrimaryPayload = false)
         {
             var bytes = File.ReadAllBytes(path);
             var resource = new Resource();
@@ -835,8 +879,26 @@ internal static class ModelComposer
                     control,
                     label,
                     allowExternalRemapping);
-                var meshBlocks = CollectMeshBlocks(resource, definitions, label);
-                ValidateBlockLayout(resource, meshBlocks, control, references, editInfo, model, label);
+                var meshBlocks = allowPrimaryPayload
+                    ? CollectPrimaryPayloadBlocks(
+                        resource,
+                        control,
+                        references,
+                        editInfo,
+                        model,
+                        label)
+                    : CollectMeshBlocks(resource, definitions, label);
+                if (!allowPrimaryPayload)
+                {
+                    ValidateBlockLayout(
+                        resource,
+                        meshBlocks,
+                        control,
+                        references,
+                        editInfo,
+                        model,
+                        label);
+                }
                 var meshes = model.GetEmbeddedMeshesAndLoD()
                     .Select(mesh =>
                     {
@@ -1019,6 +1081,28 @@ internal static class ModelComposer
             }
         }
         return definitions;
+    }
+
+    private static List<Block> CollectPrimaryPayloadBlocks(
+        Resource resource,
+        BinaryKV3 control,
+        ResourceExtRefList references,
+        Block editInfo,
+        Model model,
+        string label)
+    {
+        var coreBlocks = new HashSet<Block> { control, references, editInfo, model };
+        var payloadBlocks = resource.Blocks
+            .Where(block => !coreBlocks.Contains(block))
+            .ToList();
+        if (payloadBlocks.Count == 0
+            || !resource.Blocks.Take(payloadBlocks.Count).SequenceEqual(payloadBlocks)
+            || resource.Blocks.Skip(payloadBlocks.Count).Any(block => !coreBlocks.Contains(block)))
+        {
+            throw new InvalidDataException(
+                $"The {label} model has an unsupported compiled-resource block order.");
+        }
+        return payloadBlocks;
     }
 
     private static List<Block> CollectMeshBlocks(

@@ -105,6 +105,7 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         "persona_slot_defaults_restored": counters[
             "persona_slot_defaults_restored"
         ],
+        "persona_slot_models_hidden": counters["persona_slot_models_hidden"],
         "persona_profiles_validated": counters["persona_profiles_validated"],
         "persona_profile_slots_resolved": counters[
             "persona_profile_slots_resolved"
@@ -143,6 +144,10 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
                 composition.target,
                 composition.primary_source,
                 composition.secondary_source,
+                tuple(
+                    (part.source, part.mode)
+                    for part in composition.additional_parts
+                ),
             ),
         ),
         model_attachment_offsets=sorted(

@@ -13,6 +13,7 @@ from dota_disabler.domain import (
     BuildOptions,
     ModelAttachmentOffset,
     ModelComposition,
+    ModelCompositionPart,
     Plan,
 )
 from dota_disabler.errors import GeneratorError
@@ -53,6 +54,12 @@ class BuildOrchestrationTests(unittest.TestCase):
             item_id="10",
             hero="npc_dota_hero_test",
             slot="back_persona_1",
+            additional_parts=(
+                ModelCompositionPart(
+                    source="models/heroes/test/armor.vmdl",
+                    mode="skeleton-union",
+                ),
+            ),
         )
         plan = Plan(
             mappings=[],
@@ -66,6 +73,7 @@ class BuildOrchestrationTests(unittest.TestCase):
             {
                 "models/heroes/test/head.vmdl_c",
                 "models/heroes/test/cape.vmdl_c",
+                "models/heroes/test/armor.vmdl_c",
             },
         )
 

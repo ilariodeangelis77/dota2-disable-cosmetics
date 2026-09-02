@@ -122,6 +122,7 @@ def audit_live_install(
             for source in (
                 composition.primary_source,
                 composition.secondary_source,
+                *(part.source for part in composition.additional_parts),
             )
         )
         source_resources.update(

@@ -53,7 +53,11 @@ def _record_wearable_fallback(
     reviewed_persona_fallback: bool,
 ) -> None:
     if reviewed_persona_fallback:
-        context.increment("persona_slot_defaults_restored")
+        context.increment(
+            "persona_slot_models_hidden"
+            if source == INVISIBLE_MODEL
+            else "persona_slot_defaults_restored"
+        )
     elif has_bodygroup_rules and full_hero_fallback:
         context.increment("bodygroup_hero_fallbacks")
     elif full_hero_fallback:
@@ -72,6 +76,14 @@ def _wearable_reason(
     style: bool,
 ) -> str:
     if reviewed_persona_fallback:
+        if source == INVISIBLE_MODEL:
+            if state.is_base:
+                return "persona default wearable hidden by reviewed slot policy"
+            return (
+                "persona style hidden by reviewed slot policy"
+                if style
+                else "persona wearable hidden by reviewed slot policy"
+            )
         if state.is_base:
             return "persona default wearable replaced with reviewed hero slot default"
         return (

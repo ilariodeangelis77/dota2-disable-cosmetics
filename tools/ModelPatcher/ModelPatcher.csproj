@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Dota2ModelSkinPatcher</AssemblyName>
     <RootNamespace>Dota2CosmeticDisabler.ModelPatcher</RootNamespace>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <DebugType>embedded</DebugType>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>

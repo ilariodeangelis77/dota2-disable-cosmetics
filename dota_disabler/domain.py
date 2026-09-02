@@ -54,8 +54,16 @@ class Mapping:
 
 
 @dataclass(frozen=True)
+class ModelCompositionPart:
+    """Append one more compatible source model to an existing composition."""
+
+    source: str
+    mode: str
+
+
+@dataclass(frozen=True)
 class ModelComposition:
-    """Build one compiled model from two reviewed, compatible source models."""
+    """Build one compiled model from reviewed, compatible source models."""
 
     primary_source: str
     secondary_source: str
@@ -66,6 +74,7 @@ class ModelComposition:
     hero: str
     slot: str
     mode: str = "shared-root"
+    additional_parts: tuple[ModelCompositionPart, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -132,6 +141,7 @@ __all__ = [
     "Mapping",
     "ModelAttachmentOffset",
     "ModelComposition",
+    "ModelCompositionPart",
     "Plan",
     "ProgressCallback",
     "ProgressUpdateCallback",

@@ -25,6 +25,7 @@ class PersonaSlotCompositionProfile:
     primary_fallback_slot: str
     secondary_fallback_slot: str
     mode: str
+    additional_fallbacks: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,9 @@ class PersonaProfile:
 
     hero: str
     slot_fallbacks: tuple[tuple[str, str], ...]
+    hidden_slots: tuple[str, ...] = ()
     base_visual_slots: tuple[str, ...] = ()
+    base_particle_slots: tuple[str, ...] = ()
     model_compositions: tuple[PersonaCompositionProfile, ...] = ()
     slot_compositions: tuple[PersonaSlotCompositionProfile, ...] = ()
     attachment_offsets: tuple[PersonaAttachmentOffsetProfile, ...] = ()
@@ -58,6 +61,11 @@ class PersonaProfile:
             ),
             None,
         )
+
+    def hides_slot(self, persona_slot: str) -> bool:
+        """Return whether a reviewed Persona-only slot has no normal counterpart."""
+
+        return persona_slot in self.hidden_slots
 
 
 PERSONA_PROFILES = {
@@ -97,6 +105,36 @@ PERSONA_PROFILES = {
                 ("offhand_weapon_persona_1", "offhand_weapon"),
                 ("head_persona_1", "head"),
                 ("armor_persona_1", "armor"),
+            ),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_morphling",
+            # Normal Morphling's back is integrated into the base hero model,
+            # so the Automaton neck/back hook has no normal wearable to restore.
+            # Arms are deliberately omitted: that Persona slot is currently
+            # model-less and should be reviewed if Valve gives it a model.
+            slot_fallbacks=(),
+            hidden_slots=("neck_persona_1",),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_oracle",
+            # The Automaton exposes two wearable hooks for Oracle's four
+            # normal pieces. Keep the weapon direct, then assemble the back,
+            # armor, and head on the remaining hook with reviewed skeleton
+            # unions that preserve the animated back model as the primary.
+            slot_fallbacks=(
+                ("weapon_persona_1", "weapon"),
+                ("back_persona_1", "back"),
+            ),
+            base_particle_slots=("weapon_persona_1",),
+            slot_compositions=(
+                PersonaSlotCompositionProfile(
+                    slot="back_persona_1",
+                    primary_fallback_slot="back",
+                    secondary_fallback_slot="armor",
+                    mode="skeleton-union",
+                    additional_fallbacks=(("head", "skeleton-union"),),
+                ),
             ),
         ),
         PersonaProfile(

@@ -148,6 +148,7 @@ def _source_resources_for_plan(plan: Plan) -> set[str]:
         for source in (
             composition.primary_source,
             composition.secondary_source,
+            *(part.source for part in composition.additional_parts),
         )
     )
     resources.update(

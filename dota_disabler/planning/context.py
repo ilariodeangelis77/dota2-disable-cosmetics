@@ -16,6 +16,7 @@ from ..constants import (
     INVISIBLE_MODEL,
     NEUTRAL_PARTICLE,
     PARTICLE_DEFAULT_PATH_EXCEPTIONS,
+    PARTICLE_REPLACEMENT_TYPES,
     RESOURCE_MATERIAL,
     RESOURCE_MODEL,
     RESOURCE_PARTICLE,
@@ -23,7 +24,13 @@ from ..constants import (
     RETIRED_ITEM_NAME_MARKERS,
     SUPPORTED_CATEGORIES,
 )
-from ..domain import ItemRecord, Mapping, ModelAttachmentOffset, ModelComposition
+from ..domain import (
+    ItemRecord,
+    Mapping,
+    ModelAttachmentOffset,
+    ModelComposition,
+    ModelCompositionPart,
+)
 from ..resources import (
     canonical,
     looks_like_material,
@@ -60,6 +67,7 @@ COUNTER_NAMES = (
     "bodygroup_hero_fallbacks",
     "full_hero_wearable_fallbacks",
     "persona_slot_defaults_restored",
+    "persona_slot_models_hidden",
     "persona_profiles_validated",
     "persona_profile_slots_resolved",
     "persona_profile_slots_unresolved",
@@ -189,8 +197,20 @@ class PlanningContext:
         for item in items.values():
             if item_attr(item, prefabs, "baseitem") != "1":
                 continue
+            slot = item_attr(item, prefabs, "item_slot")
+            profile = PERSONA_PROFILES.get(item.hero or "")
+            reviewed_persona_particles = bool(
+                profile and slot in profile.base_particle_slots
+            )
             for visual in item.visuals:
-                for resource in (visual.get("asset", ""), visual.get("modifier", "")):
+                for field in ("asset", "modifier"):
+                    if (
+                        reviewed_persona_particles
+                        and field == "modifier"
+                        and visual.get("type") in PARTICLE_REPLACEMENT_TYPES
+                    ):
+                        continue
+                    resource = visual.get(field, "")
                     if looks_like_particle(resource) or looks_like_particle_snapshot(resource):
                         protected_effect_resources.add(canonical(resource))
 
@@ -271,6 +291,8 @@ class PlanningContext:
         if not hero:
             return None
         profile = PERSONA_PROFILES.get(hero)
+        if profile and profile.hides_slot(slot):
+            return INVISIBLE_MODEL
         fallback_slot = profile.fallback_slot_for(slot) if profile else None
         if not fallback_slot:
             return None
@@ -281,7 +303,10 @@ class PlanningContext:
         if not hero:
             return False
         profile = PERSONA_PROFILES.get(hero)
-        return bool(profile and profile.fallback_slot_for(slot))
+        return bool(
+            profile
+            and (profile.fallback_slot_for(slot) or profile.hides_slot(slot))
+        )
 
     @staticmethod
     def has_reviewed_persona_base_visual_slot(
@@ -292,6 +317,16 @@ class PlanningContext:
             return False
         profile = PERSONA_PROFILES.get(hero)
         return bool(profile and slot in profile.base_visual_slots)
+
+    @staticmethod
+    def has_reviewed_persona_base_particle_slot(
+        hero: Optional[str],
+        slot: str,
+    ) -> bool:
+        if not hero:
+            return False
+        profile = PERSONA_PROFILES.get(hero)
+        return bool(profile and slot in profile.base_particle_slots)
 
     def validate_persona_profiles(self) -> None:
         if CATEGORY_PERSONA_MODELS not in self.enabled:
@@ -316,6 +351,18 @@ class PlanningContext:
                     "hero_model_change",
                 }
                 and looks_like_model(visual.get("modifier", ""))
+                for visual in item.visuals
+            )
+        }
+        modeled_base_particle_slots = {
+            (item.hero, item_attr(item, self.prefabs, "item_slot"))
+            for item in self.items.values()
+            if item.hero
+            and item_attr(item, self.prefabs, "baseitem") == "1"
+            and any(
+                visual.get("type") in PARTICLE_REPLACEMENT_TYPES
+                and looks_like_particle(visual.get("asset", ""))
+                and looks_like_particle(visual.get("modifier", ""))
                 for visual in item.visuals
             )
         }
@@ -348,6 +395,26 @@ class PlanningContext:
                         "reason": reason,
                     }
                 )
+            for persona_slot in profile.hidden_slots:
+                if (profile.hero, persona_slot) in modeled_slots:
+                    self.increment("persona_profile_slots_resolved")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_profile_slots_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": persona_slot,
+                        "type": "persona_profile",
+                        "fallback_slot": None,
+                        "reason": (
+                            "reviewed hidden Persona slot is absent from the "
+                            "current schema"
+                        ),
+                    }
+                )
             for persona_slot in profile.base_visual_slots:
                 if (profile.hero, persona_slot) in modeled_base_visual_slots:
                     self.increment("persona_profile_slots_resolved")
@@ -365,6 +432,26 @@ class PlanningContext:
                         "reason": (
                             "reviewed Persona base visual slot has no current "
                             "model-changing rule"
+                        ),
+                    }
+                )
+            for persona_slot in profile.base_particle_slots:
+                if (profile.hero, persona_slot) in modeled_base_particle_slots:
+                    self.increment("persona_profile_slots_resolved")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_profile_slots_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": persona_slot,
+                        "type": "persona_profile",
+                        "fallback_slot": None,
+                        "reason": (
+                            "reviewed Persona base particle slot has no current "
+                            "particle-replacement rule"
                         ),
                     }
                 )
@@ -422,6 +509,9 @@ class PlanningContext:
                         ),
                         "secondary_fallback_slot": (
                             composition_profile.secondary_fallback_slot
+                        ),
+                        "additional_fallbacks": (
+                            composition_profile.additional_fallbacks
                         ),
                         "mode": composition_profile.mode,
                         "reason": reason,
@@ -579,7 +669,11 @@ class PlanningContext:
         profile: PersonaProfile,
         composition_profile: PersonaSlotCompositionProfile,
     ) -> tuple[list[ModelComposition], str]:
-        if composition_profile.mode not in {"shared-root", "skeleton-overlay"}:
+        supported_modes = {"shared-root", "skeleton-overlay", "skeleton-union"}
+        if composition_profile.mode not in supported_modes or any(
+            mode not in supported_modes
+            for _fallback_slot, mode in composition_profile.additional_fallbacks
+        ):
             return [], "reviewed Persona slot composition has an unsupported mode"
 
         primary_source = self.default_model_for(
@@ -602,7 +696,28 @@ class PlanningContext:
             return [], "reviewed secondary fallback is not a safe model path"
         primary_source = canonical(primary_source)
         secondary_source = canonical(secondary_source)
-        if primary_source == secondary_source:
+        additional_parts: list[ModelCompositionPart] = []
+        for fallback_slot, mode in composition_profile.additional_fallbacks:
+            source = self.default_model_for(
+                self.defaults.get((profile.hero, fallback_slot))
+            )
+            if source is None:
+                return (
+                    [],
+                    f"reviewed additional fallback slot {fallback_slot} has no current default model",
+                )
+            if not looks_like_model(source):
+                return [], "reviewed additional fallback is not a safe model path"
+            additional_parts.append(
+                ModelCompositionPart(source=canonical(source), mode=mode)
+            )
+
+        sources = [
+            primary_source,
+            secondary_source,
+            *(part.source for part in additional_parts),
+        ]
+        if len(set(sources)) != len(sources):
             return [], "reviewed Persona slot composition resolved to one source model"
 
         target_owners: dict[str, set[str]] = {}
@@ -650,6 +765,7 @@ class PlanningContext:
                     hero=profile.hero,
                     slot=composition_profile.slot,
                     mode=composition_profile.mode,
+                    additional_parts=tuple(additional_parts),
                 )
                 for target, item_ids in sorted(target_owners.items())
             ],

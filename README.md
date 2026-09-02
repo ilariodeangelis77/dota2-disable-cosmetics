@@ -311,20 +311,22 @@ Both are bundled under the MIT License; see
 ## Validation status
 
 The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25071102`
-on 2026-09-02. A non-deploying audit packed, reopened, and CRC-validated 16,471 entries with no
+on 2026-09-02. A non-deploying audit packed, reopened, and CRC-validated 16,481 entries with no
 missing final source resources:
 
 | Resource type | Mappings |
 | --- | ---: |
-| Models | 10,890 |
+| Models | 10,893 |
 | Materials | 112 |
-| Particles | 5,227 |
+| Particles | 5,234 |
 | Particle snapshots | 241 |
 
-The model total includes eight reviewed two-part compositions: Mirana's Dark Moon Back target and
-seven current Invoker Persona head targets. Invoker's compositions preserve the adult face morph
-data while combining the adult hair and face on one Persona hook. One additional hidden Invoker
-loadout model is included to raise the three orb attachments to adult height.
+The model total includes nine reviewed compositions: Mirana's Dark Moon Back target, seven current
+Invoker Persona head targets, and Oracle's Automaton back hook. The Oracle composition assembles
+the normal animated back, armor, and head in two verified skeleton-union stages. Invoker's
+compositions preserve the adult face morph data while combining the adult hair and face on one
+Persona hook. One additional hidden Invoker loadout model is included to raise the three orb
+attachments to adult height.
 
 An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
 recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
@@ -337,7 +339,12 @@ glaives were also confirmed in the live client on 2026-09-02. These results must
 as proof that every cosmetic or Persona works with the current live game. Invoker's reviewed
 profile now composes the adult hair and morph-enabled face onto every current Persona head target,
 uses the freed shoulder hook for the adult shoulders, and raises the Kid-only loadout orb rig to
-adult height; that adjustment still needs a focused live-client recheck.
+adult height; that revision was subsequently confirmed in the live client. Morphling's Automaton
+profile restores the normal body and Waveform while hiding the Persona-only back and inferred arms
+refit, and was subsequently confirmed in the live client. Oracle's Automaton profile restores the
+normal body and weapon, assembles the normal animated back, armor, and head on the remaining Persona
+hook, and restores all seven declared ability-particle replacements; that revision was also
+subsequently confirmed in the live client.
 
 ## Development
 

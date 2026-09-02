@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.4.0";
+    private const string Version = "0.5.0";
 
     public static int Main(string[] args)
     {
@@ -147,6 +147,7 @@ internal static partial class Program
         {
             "shared-root" => ModelCompositionMode.SharedRoot,
             "skeleton-overlay" => ModelCompositionMode.SkeletonOverlay,
+            "skeleton-union" => ModelCompositionMode.SkeletonUnion,
             _ => throw new ArgumentException($"Unsupported composition mode: {modeName}"),
         };
         var result = ModelComposer.Compose(primaryPath, secondaryPath, outputPath, mode);

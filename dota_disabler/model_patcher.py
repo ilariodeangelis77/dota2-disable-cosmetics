@@ -16,8 +16,10 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
-MODEL_PATCHER_VERSION = "0.4.0"
-MODEL_COMPOSITION_MODES = frozenset({"shared-root", "skeleton-overlay"})
+MODEL_PATCHER_VERSION = "0.5.0"
+MODEL_COMPOSITION_MODES = frozenset(
+    {"shared-root", "skeleton-overlay", "skeleton-union"}
+)
 
 
 def find_model_patcher(explicit: Optional[str] = None) -> Path:
@@ -157,6 +159,13 @@ def compose_models(
         remapped_bone_references = int(result["remapped_bone_references"])
         output_references = int(result["output_references"])
         output_bytes = int(result["output_bytes"])
+        valid_shared_bones = (
+            shared_bones == 1
+            if mode == "shared-root"
+            else shared_bones == secondary_bones
+            if mode == "skeleton-overlay"
+            else 1 <= shared_bones <= min(primary_bones, secondary_bones)
+        )
         if (
             result["mode"] != mode
             or primary_meshes < 1
@@ -164,8 +173,7 @@ def compose_models(
             or output_meshes != primary_meshes + secondary_meshes
             or primary_bones < 1
             or secondary_bones < 1
-            or shared_bones
-            != (1 if mode == "shared-root" else secondary_bones)
+            or not valid_shared_bones
             or output_bones != primary_bones + secondary_bones - shared_bones
             or remapped_bone_references < 0
             or (mode == "skeleton-overlay" and remapped_bone_references == 0)

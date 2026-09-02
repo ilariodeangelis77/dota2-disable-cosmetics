@@ -127,7 +127,13 @@ def process_item_effects(
 ) -> None:
     """Collect supported particle and snapshot rules for one item."""
 
-    if state.is_base or CATEGORY_PARTICLE_EFFECTS not in context.enabled:
+    if CATEGORY_PARTICLE_EFFECTS not in context.enabled or (
+        state.is_base
+        and not context.has_reviewed_persona_base_particle_slot(
+            state.hero,
+            state.slot,
+        )
+    ):
         return
 
     defaults_for_created_particles = (
