@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -28,23 +27,24 @@ from dota_disabler.constants import (
     RESOURCE_MATERIAL,
     RESOURCE_PARTICLE,
 )
+from dota_disabler.deployment import deploy_overrides
 from dota_disabler.paths import path_under
 from dota_disabler.model_patcher import (
     find_model_patcher,
-    patch_model_material_groups_batch,
     validate_model_patcher,
 )
 from dota_disabler.planning import apply_missing_particle_fallbacks, apply_model_skin_material_fallbacks
 from dota_disabler.reporting import write_plan
 from dota_disabler.resources import (
     compiled_material_path,
+    compiled_model_path,
     compiled_override_path,
     compiled_particle_path,
     looks_like_model,
 )
 from dota_disabler.version import VERSION
 from dota_disabler.versioning import capture_dota_version, dota_version_label, find_dota_install
-from dota_disabler.vpk import extract_vpk, find_vpk_extractor, pack_vpk, validate_vpk_extractor
+from dota_disabler.vpk import extract_vpk, find_vpk_extractor, validate_vpk_extractor
 from dota_disabler.schema import load_items_game
 
 
@@ -116,13 +116,29 @@ def audit_live_install(
             compiled_override_path(mapping.source, mapping.resource_type)
             for mapping in plan.mappings
         }
+        source_resources.update(
+            compiled_model_path(source)
+            for composition in plan.model_compositions
+            for source in (
+                composition.primary_source,
+                composition.secondary_source,
+            )
+        )
+        source_resources.update(
+            compiled_model_path(adjustment.source)
+            for adjustment in plan.model_attachment_offsets
+        )
         if any(mapping.resource_type == RESOURCE_PARTICLE for mapping in plan.mappings):
             source_resources.add(compiled_particle_path(NEUTRAL_PARTICLE))
         extract_vpk(extractor, game_pak, sorted(source_resources), cache)
 
         plan = apply_model_skin_material_fallbacks(plan, cache)
         model_patcher = None
-        if plan.stats.get("alternate_skin_group_patch_targets", 0):
+        if (
+            plan.stats.get("alternate_skin_group_patch_targets", 0)
+            or plan.model_compositions
+            or plan.model_attachment_offsets
+        ):
             model_patcher = find_model_patcher(model_patcher_path)
             validate_model_patcher(model_patcher)
         material_sources = sorted(
@@ -173,37 +189,41 @@ def audit_live_install(
 
         packed_resources = 0
         if pack:
-            staging = audit_root / "staging"
-            patch_jobs = []
-            for mapping in plan.mappings:
-                source = path_under(
-                    cache,
-                    compiled_override_path(mapping.source, mapping.resource_type),
-                )
-                target = path_under(
-                    staging,
-                    compiled_override_path(mapping.target, mapping.resource_type),
-                )
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if mapping.resource_type == "model" and mapping.required_material_groups > 1:
-                    patch_jobs.append((source, target, mapping.required_material_groups))
-                else:
-                    shutil.copy2(source, target)
-            patch_model_material_groups_batch(
-                model_patcher,
-                patch_jobs,
-                staging,
+            output = audit_root / "dota_dutch"
+            packed_resources, missing = deploy_overrides(
+                plan,
+                cache,
+                output,
+                audit_root / "work",
+                extractor=extractor,
+                model_patcher=model_patcher,
+                game_pak=game_pak,
+                clean_first=True,
+                allow_missing=False,
+                language="dutch",
+                enabled_categories=DEFAULT_CATEGORIES,
                 progress=lambda _message: None,
             )
-            packed_resources = pack_vpk(
-                extractor,
-                staging,
-                audit_root / "pak98_dir.vpk",
-            )
-            if packed_resources != len(plan.mappings):
+            if missing:
                 raise RuntimeError(
-                    "Packed resource count does not match the final mapping count: "
-                    f"{packed_resources} != {len(plan.mappings)}"
+                    f"Temporary deployment reported {len(missing)} missing resource(s)."
+                )
+            expected_targets = {
+                compiled_override_path(mapping.target, mapping.resource_type)
+                for mapping in plan.mappings
+            }
+            expected_targets.update(
+                compiled_model_path(composition.target)
+                for composition in plan.model_compositions
+            )
+            expected_targets.update(
+                compiled_model_path(adjustment.target)
+                for adjustment in plan.model_attachment_offsets
+            )
+            if packed_resources != len(expected_targets):
+                raise RuntimeError(
+                    "Packed resource count does not match the final target count: "
+                    f"{packed_resources} != {len(expected_targets)}"
                 )
 
         if report is not None:

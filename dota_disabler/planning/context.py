@@ -23,7 +23,7 @@ from ..constants import (
     RETIRED_ITEM_NAME_MARKERS,
     SUPPORTED_CATEGORIES,
 )
-from ..domain import ItemRecord, Mapping
+from ..domain import ItemRecord, Mapping, ModelAttachmentOffset, ModelComposition
 from ..resources import (
     canonical,
     looks_like_material,
@@ -32,7 +32,13 @@ from ..resources import (
     looks_like_particle_snapshot,
 )
 from ..schema import item_attr
-from .personas import PERSONA_PROFILES
+from .personas import (
+    PERSONA_PROFILES,
+    PersonaAttachmentOffsetProfile,
+    PersonaCompositionProfile,
+    PersonaProfile,
+    PersonaSlotCompositionProfile,
+)
 
 
 COUNTER_NAMES = (
@@ -57,6 +63,10 @@ COUNTER_NAMES = (
     "persona_profiles_validated",
     "persona_profile_slots_resolved",
     "persona_profile_slots_unresolved",
+    "persona_model_compositions_planned",
+    "persona_model_compositions_unresolved",
+    "persona_attachment_offsets_planned",
+    "persona_attachment_offsets_unresolved",
     "pet_models_hidden",
     "retired_items_skipped",
     "model_asset_defaults_inferred",
@@ -102,6 +112,8 @@ class PlanningContext:
     default_created_particles: dict[tuple[str, str], list[str]]
     protected_effect_resources: set[str]
     candidates: list[Mapping] = field(default_factory=list)
+    model_compositions: list[ModelComposition] = field(default_factory=list)
+    model_attachment_offsets: list[ModelAttachmentOffset] = field(default_factory=list)
     unresolved: list[dict] = field(default_factory=list)
     default_sources_by_target: dict[str, set[str]] = field(default_factory=dict)
     pending_model_overrides: list[PendingModelOverride] = field(default_factory=list)
@@ -356,8 +368,293 @@ class PlanningContext:
                         ),
                     }
                 )
+            for composition_profile in profile.model_compositions:
+                composition, reason = self._resolve_persona_composition(
+                    profile,
+                    composition_profile,
+                )
+                if composition is not None:
+                    self.model_compositions.append(composition)
+                    self.increment("persona_model_compositions_planned")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_model_compositions_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": composition_profile.item_id,
+                        "hero": profile.hero,
+                        "slot": composition_profile.slot,
+                        "type": "persona_model_composition",
+                        "target": canonical(composition_profile.target),
+                        "primary_fallback_slot": (
+                            composition_profile.primary_fallback_slot
+                        ),
+                        "secondary_fallback_slot": (
+                            composition_profile.secondary_fallback_slot
+                        ),
+                        "reason": reason,
+                    }
+                )
+            for composition_profile in profile.slot_compositions:
+                compositions, reason = self._resolve_persona_slot_compositions(
+                    profile,
+                    composition_profile,
+                )
+                if compositions:
+                    self.model_compositions.extend(compositions)
+                    self.increment(
+                        "persona_model_compositions_planned",
+                        len(compositions),
+                    )
+                    continue
+
+                profile_valid = False
+                self.increment("persona_model_compositions_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": composition_profile.slot,
+                        "type": "persona_slot_model_composition",
+                        "primary_fallback_slot": (
+                            composition_profile.primary_fallback_slot
+                        ),
+                        "secondary_fallback_slot": (
+                            composition_profile.secondary_fallback_slot
+                        ),
+                        "mode": composition_profile.mode,
+                        "reason": reason,
+                    }
+                )
+            for offset_profile in profile.attachment_offsets:
+                adjustment, reason = self._resolve_persona_attachment_offset(
+                    profile,
+                    offset_profile,
+                )
+                if adjustment is not None:
+                    self.model_attachment_offsets.append(adjustment)
+                    self.increment("persona_attachment_offsets_planned")
+                    continue
+
+                profile_valid = False
+                self.increment("persona_attachment_offsets_unresolved")
+                self.unresolved.append(
+                    {
+                        "item_id": None,
+                        "hero": profile.hero,
+                        "slot": offset_profile.slot,
+                        "type": "persona_attachment_offset",
+                        "trigger_particle": canonical(offset_profile.trigger_particle),
+                        "target": canonical(offset_profile.model),
+                        "reason": reason,
+                    }
+                )
             if profile_valid:
                 self.increment("persona_profiles_validated")
+
+    def _resolve_persona_attachment_offset(
+        self,
+        profile: PersonaProfile,
+        offset_profile: PersonaAttachmentOffsetProfile,
+    ) -> tuple[Optional[ModelAttachmentOffset], str]:
+        item = self.defaults.get((profile.hero, offset_profile.slot))
+        if item is None:
+            return None, "reviewed Persona offset slot has no current default item"
+
+        created_particles = {
+            canonical(visual.get("modifier", "") or visual.get("asset", ""))
+            for visual in item.visuals
+            if visual.get("type") == "particle_create"
+            and looks_like_particle(
+                visual.get("modifier", "") or visual.get("asset", "")
+            )
+        }
+        trigger = canonical(offset_profile.trigger_particle)
+        if trigger not in created_particles:
+            return None, "reviewed Persona loadout particle is absent from the current slot"
+        if not looks_like_model(offset_profile.model):
+            return None, "reviewed Persona offset target is not a safe model path"
+        if not offset_profile.attachments or any(
+            not attachment.strip() for attachment in offset_profile.attachments
+        ):
+            return None, "reviewed Persona offset has invalid attachment names"
+        if not any(offset_profile.offset):
+            return None, "reviewed Persona offset is empty"
+
+        model = canonical(offset_profile.model)
+        return (
+            ModelAttachmentOffset(
+                source=model,
+                target=model,
+                attachments=offset_profile.attachments,
+                offset=offset_profile.offset,
+                reason="reviewed Persona loadout attachment height restored",
+                category=CATEGORY_PERSONA_MODELS,
+                item_id=item.item_id,
+                hero=profile.hero,
+                slot=offset_profile.slot,
+            ),
+            "",
+        )
+
+    def _resolve_persona_composition(
+        self,
+        profile: PersonaProfile,
+        composition_profile: PersonaCompositionProfile,
+    ) -> tuple[Optional[ModelComposition], str]:
+        item = self.items.get(composition_profile.item_id)
+        if item is None:
+            return (
+                None,
+                "reviewed Persona composition item is absent from the current schema",
+            )
+        if item.hero != profile.hero:
+            return None, "reviewed Persona composition item belongs to a different hero"
+        current_slot = item_attr(item, self.prefabs, "item_slot")
+        if current_slot != composition_profile.slot:
+            return None, "reviewed Persona composition item moved to a different slot"
+
+        if not looks_like_model(composition_profile.target):
+            return None, "reviewed Persona composition target is not a safe model path"
+        target = canonical(composition_profile.target)
+        current_targets = {
+            canonical(model)
+            for _key, model in (*item.top_models, *item.nested_models)
+            if looks_like_model(model)
+        }
+        current_targets.update(
+            canonical(modifier)
+            for visual in item.visuals
+            for modifier in (visual.get("modifier", ""),)
+            if looks_like_model(modifier)
+        )
+        if target not in current_targets:
+            return None, "reviewed Persona composition target is absent from the current item"
+
+        primary_source = self.default_model_for(
+            self.defaults.get(
+                (profile.hero, composition_profile.primary_fallback_slot)
+            )
+        )
+        secondary_source = self.default_model_for(
+            self.defaults.get(
+                (profile.hero, composition_profile.secondary_fallback_slot)
+            )
+        )
+        if primary_source is None:
+            return None, "reviewed primary fallback slot has no current default model"
+        if secondary_source is None:
+            return None, "reviewed secondary fallback slot has no current default model"
+        if not looks_like_model(primary_source):
+            return None, "reviewed primary fallback is not a safe model path"
+        if not looks_like_model(secondary_source):
+            return None, "reviewed secondary fallback is not a safe model path"
+        primary_source = canonical(primary_source)
+        secondary_source = canonical(secondary_source)
+        if primary_source == secondary_source:
+            return (
+                None,
+                "reviewed Persona composition resolved to the same source model twice",
+            )
+
+        return (
+            ModelComposition(
+                primary_source=primary_source,
+                secondary_source=secondary_source,
+                target=target,
+                reason=(
+                    "reviewed Persona wearable composed from compatible hero slot defaults"
+                ),
+                category=CATEGORY_PERSONA_MODELS,
+                item_id=item.item_id,
+                hero=profile.hero,
+                slot=current_slot,
+            ),
+            "",
+        )
+
+    def _resolve_persona_slot_compositions(
+        self,
+        profile: PersonaProfile,
+        composition_profile: PersonaSlotCompositionProfile,
+    ) -> tuple[list[ModelComposition], str]:
+        if composition_profile.mode not in {"shared-root", "skeleton-overlay"}:
+            return [], "reviewed Persona slot composition has an unsupported mode"
+
+        primary_source = self.default_model_for(
+            self.defaults.get(
+                (profile.hero, composition_profile.primary_fallback_slot)
+            )
+        )
+        secondary_source = self.default_model_for(
+            self.defaults.get(
+                (profile.hero, composition_profile.secondary_fallback_slot)
+            )
+        )
+        if primary_source is None:
+            return [], "reviewed primary fallback slot has no current default model"
+        if secondary_source is None:
+            return [], "reviewed secondary fallback slot has no current default model"
+        if not looks_like_model(primary_source):
+            return [], "reviewed primary fallback is not a safe model path"
+        if not looks_like_model(secondary_source):
+            return [], "reviewed secondary fallback is not a safe model path"
+        primary_source = canonical(primary_source)
+        secondary_source = canonical(secondary_source)
+        if primary_source == secondary_source:
+            return [], "reviewed Persona slot composition resolved to one source model"
+
+        target_owners: dict[str, set[str]] = {}
+        for item in self.items.values():
+            if (
+                item.hero != profile.hero
+                or item_attr(item, self.prefabs, "item_slot")
+                != composition_profile.slot
+            ):
+                continue
+            targets = {
+                canonical(model)
+                for _key, model in (*item.top_models, *item.nested_models)
+                if looks_like_model(model)
+            }
+            targets.update(
+                canonical(visual.get("modifier", ""))
+                for visual in item.visuals
+                if visual.get("type") == "model"
+                and looks_like_model(visual.get("modifier", ""))
+            )
+            for target in targets:
+                target_owners.setdefault(target, set()).add(item.item_id)
+
+        if not target_owners:
+            return [], "reviewed Persona composition slot has no current model targets"
+
+        return (
+            [
+                ModelComposition(
+                    primary_source=primary_source,
+                    secondary_source=secondary_source,
+                    target=target,
+                    reason=(
+                        "reviewed Persona slot composed from compatible hero defaults"
+                    ),
+                    category=CATEGORY_PERSONA_MODELS,
+                    item_id=min(
+                        item_ids,
+                        key=lambda item_id: (
+                            not item_id.isdigit(),
+                            int(item_id) if item_id.isdigit() else item_id,
+                        ),
+                    ),
+                    hero=profile.hero,
+                    slot=composition_profile.slot,
+                    mode=composition_profile.mode,
+                )
+                for target, item_ids in sorted(target_owners.items())
+            ],
+            "",
+        )
 
     def default_entity_model_for(self, asset: str) -> Optional[str]:
         direct = self.entity_defaults.get(asset)

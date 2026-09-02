@@ -35,8 +35,22 @@ def write_plan(
                 set(enabled_categories)
                 if enabled_categories is not None
                 else {mapping.category for mapping in plan.mappings}
+                | {
+                    composition.category
+                    for composition in plan.model_compositions
+                }
+                | {
+                    adjustment.category
+                    for adjustment in plan.model_attachment_offsets
+                }
             ),
             "mappings": [asdict(mapping) for mapping in plan.mappings],
+            "model_compositions": [
+                asdict(composition) for composition in plan.model_compositions
+            ],
+            "model_attachment_offsets": [
+                asdict(adjustment) for adjustment in plan.model_attachment_offsets
+            ],
             "unresolved": plan.unresolved,
         },
     )

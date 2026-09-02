@@ -46,6 +46,7 @@ from .progress import BUILD_PHASE_WEIGHTS, WeightedProgress
 from .reporting import write_plan
 from .resources import (
     compiled_material_path,
+    compiled_model_path,
     compiled_override_path,
     compiled_particle_path,
 )
@@ -134,6 +135,28 @@ def parse_schemas(
         unit_models=unit_models,
         work_progress=planning_progress,
     )
+
+
+def _source_resources_for_plan(plan: Plan) -> set[str]:
+    resources = {
+        compiled_override_path(mapping.source, mapping.resource_type)
+        for mapping in plan.mappings
+    }
+    resources.update(
+        compiled_model_path(source)
+        for composition in plan.model_compositions
+        for source in (
+            composition.primary_source,
+            composition.secondary_source,
+        )
+    )
+    resources.update(
+        compiled_model_path(adjustment.source)
+        for adjustment in plan.model_attachment_offsets
+    )
+    if any(mapping.resource_type == RESOURCE_PARTICLE for mapping in plan.mappings):
+        resources.add(compiled_particle_path(NEUTRAL_PARTICLE))
+    return resources
 
 
 def _build_cosmetics_unlocked(
@@ -252,16 +275,14 @@ def _build_cosmetics_unlocked(
     write_plan(plan, report, enabled_categories=enabled_categories)
     build_progress.complete(
         "planning",
-        f"Planned {len(plan.mappings):,} replacement mapping(s)",
+        (
+            f"Planned {len(plan.mappings):,} replacement mapping(s) and "
+            f"{len(plan.model_compositions):,} model composition(s), plus "
+            f"{len(plan.model_attachment_offsets):,} attachment adjustment(s)"
+        ),
     )
 
-    source_resources = {
-        compiled_override_path(mapping.source, mapping.resource_type)
-        for mapping in plan.mappings
-    }
-    if any(mapping.resource_type == RESOURCE_PARTICLE for mapping in plan.mappings):
-        source_resources.add(compiled_particle_path(NEUTRAL_PARTICLE))
-    sorted_source_resources = sorted(source_resources)
+    sorted_source_resources = sorted(_source_resources_for_plan(plan))
     progress(
         f"Extracting {len(sorted_source_resources)} unique replacement resource(s)..."
     )
@@ -295,12 +316,23 @@ def _build_cosmetics_unlocked(
         for mapping in plan.mappings
     )
     model_patcher: Optional[Path] = None
-    if group_patch_targets:
+    composition_targets = len(plan.model_compositions)
+    attachment_offset_targets = len(plan.model_attachment_offsets)
+    if group_patch_targets or composition_targets or attachment_offset_targets:
         model_patcher = find_model_patcher()
         validate_model_patcher(model_patcher)
+    if group_patch_targets:
         progress(
             f"Preparing {group_patch_targets} skin-sensitive default-model replacement(s) "
             "with duplicated base material groups."
+        )
+    if composition_targets:
+        progress(
+            f"Preparing {composition_targets} reviewed composed-model replacement(s)."
+        )
+    if attachment_offset_targets:
+        progress(
+            f"Preparing {attachment_offset_targets} reviewed attachment adjustment(s)."
         )
     preserved_skin_models = plan.stats.get("alternate_skin_models_skipped", 0)
     if preserved_skin_models:

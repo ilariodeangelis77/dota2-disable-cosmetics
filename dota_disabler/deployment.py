@@ -26,7 +26,11 @@ from .constants import (
 )
 from .domain import CleanResult, Plan, ProgressCallback, ProgressUpdateCallback
 from .errors import GeneratorError, UnsafeOutputError
-from .model_patcher import patch_model_material_groups_batch
+from .model_patcher import (
+    compose_models,
+    offset_model_attachments,
+    patch_model_material_groups_batch,
+)
 from .paths import path_under
 from .progress import DEPLOYMENT_PHASE_WEIGHTS, WeightedProgress
 from .reporting import write_json
@@ -229,7 +233,17 @@ def deploy_overrides(
     selected_categories = (
         set(enabled_categories)
         if enabled_categories is not None
-        else {mapping.category for mapping in plan.mappings}
+        else (
+            {mapping.category for mapping in plan.mappings}
+            | {
+                composition.category
+                for composition in plan.model_compositions
+            }
+            | {
+                adjustment.category
+                for adjustment in plan.model_attachment_offsets
+            }
+        )
     )
     deployment_progress = WeightedProgress(progress_update, DEPLOYMENT_PHASE_WEIGHTS)
     deployment_progress.begin("staging", "Preparing override files")
@@ -244,34 +258,197 @@ def deploy_overrides(
         for mapping in plan.mappings
         if mapping.resource_type == RESOURCE_MODEL and mapping.required_material_groups > 1
     ]
-    if skin_patch_mappings and model_patcher is None:
+    if (
+        skin_patch_mappings
+        or plan.model_compositions
+        or plan.model_attachment_offsets
+    ) and model_patcher is None:
+        if plan.model_compositions or plan.model_attachment_offsets:
+            raise GeneratorError(
+                "Reviewed model transformations require the bundled model helper, but it "
+                "was not found. The Dota directory was not modified."
+            )
         raise GeneratorError(
             "Skin-sensitive replacements require the bundled model skin patcher, but it "
             "was not found. The Dota directory was not modified."
         )
 
     missing: list[dict] = []
+    missing_keys: set[tuple[str, str, str]] = set()
     staged_files: list[str] = []
     patch_jobs: list[tuple[Path, Path, int]] = []
+    composition_jobs: list[tuple[Path, Path, Path, str, int, str]] = []
+    attachment_offset_jobs: list[
+        tuple[Path, Path, str, tuple[str, ...], tuple[float, float, float]]
+    ] = []
+    ready_composition_targets: set[str] = set()
+    ready_attachment_offset_targets: set[str] = set()
+
+    def record_missing(
+        source: str,
+        target: str,
+        reason: str,
+        resource_type: str,
+        item_id: Optional[str],
+        *,
+        composition_role: Optional[str] = None,
+    ) -> None:
+        key = (source, target, resource_type)
+        if key in missing_keys:
+            return
+        missing_keys.add(key)
+        entry = {
+            "source": source,
+            "target": target,
+            "reason": reason,
+            "resource_type": resource_type,
+            "item_id": item_id,
+        }
+        if composition_role is not None:
+            entry["composition_role"] = composition_role
+        missing.append(entry)
+
+    composition_targets: set[str] = set()
+    for composition in plan.model_compositions:
+        target_relative = compiled_model_path(composition.target)
+        if target_relative in composition_targets:
+            raise GeneratorError(
+                f"Multiple model compositions target the same resource: {composition.target}"
+            )
+        composition_targets.add(target_relative)
+
+    attachment_offset_targets: set[str] = set()
+    for adjustment in plan.model_attachment_offsets:
+        target_relative = compiled_model_path(adjustment.target)
+        if target_relative in attachment_offset_targets:
+            raise GeneratorError(
+                f"Multiple attachment offsets target the same resource: {adjustment.target}"
+            )
+        if target_relative in composition_targets:
+            raise GeneratorError(
+                f"Model composition and attachment offset target the same resource: {adjustment.target}"
+            )
+        attachment_offset_targets.add(target_relative)
+
+    required_groups_by_target = {
+        compiled_model_path(mapping.target): mapping.required_material_groups
+        for mapping in plan.mappings
+        if mapping.resource_type == RESOURCE_MODEL
+    }
+    staging_count = (
+        len(plan.model_attachment_offsets)
+        + len(plan.model_compositions)
+        + len(plan.mappings)
+    )
+    for index, adjustment in enumerate(plan.model_attachment_offsets, start=1):
+        target_relative = compiled_model_path(adjustment.target)
+        source_relative = compiled_model_path(adjustment.source)
+        source = path_under(cache, source_relative)
+        if source.is_file():
+            destination = path_under(staging, target_relative)
+            attachment_offset_jobs.append(
+                (
+                    source,
+                    destination,
+                    target_relative,
+                    adjustment.attachments,
+                    adjustment.offset,
+                )
+            )
+            ready_attachment_offset_targets.add(target_relative)
+        else:
+            record_missing(
+                adjustment.source,
+                adjustment.target,
+                adjustment.reason,
+                RESOURCE_MODEL,
+                adjustment.item_id,
+            )
+        deployment_progress.work(
+            "staging",
+            index,
+            staging_count,
+            (
+                "Checking attachment-offset inputs "
+                f"({index:,} of {staging_count:,})"
+            ),
+        )
+
+    for index, composition in enumerate(plan.model_compositions, start=1):
+        target_relative = compiled_model_path(composition.target)
+        primary_relative = compiled_model_path(composition.primary_source)
+        secondary_relative = compiled_model_path(composition.secondary_source)
+        primary_source = path_under(cache, primary_relative)
+        secondary_source = path_under(cache, secondary_relative)
+        sources_ready = True
+        for role, source_name, source_path in (
+            ("primary", composition.primary_source, primary_source),
+            ("secondary", composition.secondary_source, secondary_source),
+        ):
+            if source_path.is_file():
+                continue
+            sources_ready = False
+            record_missing(
+                source_name,
+                composition.target,
+                composition.reason,
+                RESOURCE_MODEL,
+                composition.item_id,
+                composition_role=role,
+            )
+        if sources_ready:
+            destination = path_under(staging, target_relative)
+            composition_jobs.append(
+                (
+                    primary_source,
+                    secondary_source,
+                    destination,
+                    target_relative,
+                    required_groups_by_target.get(target_relative, 1),
+                    composition.mode,
+                )
+            )
+            ready_composition_targets.add(target_relative)
+        deployment_progress.work(
+            "staging",
+            len(plan.model_attachment_offsets) + index,
+            staging_count,
+            f"Checking composed-model inputs ({index:,} of {staging_count:,})",
+        )
+
     mapping_count = len(plan.mappings)
     for index, mapping in enumerate(plan.mappings, start=1):
         source_relative = compiled_override_path(mapping.source, mapping.resource_type)
         target_relative = compiled_override_path(mapping.target, mapping.resource_type)
+        completed = (
+            len(plan.model_attachment_offsets)
+            + len(plan.model_compositions)
+            + index
+        )
+        if (
+            target_relative in ready_composition_targets
+            or target_relative in ready_attachment_offset_targets
+        ):
+            deployment_progress.work(
+                "staging",
+                completed,
+                staging_count,
+                f"Staging overrides ({index:,} of {mapping_count:,})",
+            )
+            continue
         source = path_under(cache, source_relative)
         if not source.is_file():
-            missing.append(
-                {
-                    "source": mapping.source,
-                    "target": mapping.target,
-                    "reason": mapping.reason,
-                    "resource_type": mapping.resource_type,
-                    "item_id": mapping.item_id,
-                }
+            record_missing(
+                mapping.source,
+                mapping.target,
+                mapping.reason,
+                mapping.resource_type,
+                mapping.item_id,
             )
             deployment_progress.work(
                 "staging",
-                index,
-                mapping_count,
+                completed,
+                staging_count,
                 f"Staging overrides ({index:,} of {mapping_count:,})",
             )
             continue
@@ -284,13 +461,13 @@ def deploy_overrides(
         staged_files.append(target_relative)
         deployment_progress.work(
             "staging",
-            index,
-            mapping_count,
+            completed,
+            staging_count,
             f"Staging overrides ({index:,} of {mapping_count:,})",
         )
 
     deployment_progress.complete(
-        "staging", f"Staged {len(staged_files):,} override resource(s)"
+        "staging", f"Prepared {len(staged_files):,} direct override resource(s)"
     )
 
     missing_path = work / "missing-resources.json"
@@ -308,18 +485,125 @@ def deploy_overrides(
     elif missing_path.is_file():
         missing_path.unlink()
 
-    deployment_progress.begin("model_patch", "Preparing skin-sensitive default models")
+    deployment_progress.begin("model_patch", "Preparing compiled default models")
+    composition_patch_count = sum(
+        required_groups > 1
+        for _primary, _secondary, _destination, _target, required_groups, _mode
+        in composition_jobs
+    )
+    model_work_total = (
+        len(attachment_offset_jobs)
+        + len(composition_jobs)
+        + len(patch_jobs)
+        + composition_patch_count
+    )
+    composition_intermediates: list[Path] = []
+    for index, (
+        source,
+        destination,
+        _target_relative,
+        attachments,
+        offset,
+    ) in enumerate(attachment_offset_jobs, start=1):
+        assert model_patcher is not None
+        offset_model_attachments(
+            model_patcher,
+            source,
+            destination,
+            attachments,
+            offset,
+            progress=progress,
+        )
+        deployment_progress.work(
+            "model_patch",
+            index,
+            model_work_total,
+            (
+                "Adjusting reviewed model attachments "
+                f"({index:,} of {len(attachment_offset_jobs):,})"
+            ),
+        )
+
+    for index, (
+        primary_source,
+        secondary_source,
+        destination,
+        target_relative,
+        required_groups,
+        mode,
+    ) in enumerate(composition_jobs, start=1):
+        assert model_patcher is not None
+        composition_output = destination
+        if required_groups > 1:
+            composition_output = destination.with_name(
+                f".{destination.stem}.composition-input{destination.suffix}"
+            )
+            composition_intermediates.append(composition_output)
+        compose_models(
+            model_patcher,
+            primary_source,
+            secondary_source,
+            composition_output,
+            mode=mode,
+            progress=progress,
+        )
+        if required_groups > 1:
+            patch_jobs.append(
+                (composition_output, destination, required_groups)
+            )
+        deployment_progress.work(
+            "model_patch",
+            len(attachment_offset_jobs) + index,
+            model_work_total,
+            f"Composing reviewed models ({index:,} of {len(composition_jobs):,})",
+        )
+
     if patch_jobs:
+        assert model_patcher is not None
+        completed_transformations = (
+            len(attachment_offset_jobs) + len(composition_jobs)
+        )
+
+        def model_patch_progress(
+            _operation: str,
+            completed: int,
+            _total: int,
+        ) -> None:
+            deployment_progress.work(
+                "model_patch",
+                completed_transformations + completed,
+                model_work_total,
+                f"Patching skin-sensitive models ({completed:,} of {len(patch_jobs):,})",
+            )
+
         patch_model_material_groups_batch(
             model_patcher,
             patch_jobs,
             staging,
             progress=progress,
-            progress_update=deployment_progress.work_callback(
-                "model_patch", "Patching skin-sensitive models"
-            ),
+            progress_update=model_patch_progress,
         )
-    deployment_progress.complete("model_patch", "Default model preparation complete")
+    for intermediate in composition_intermediates:
+        if intermediate.is_file():
+            intermediate.unlink()
+    staged_files.extend(
+        target_relative
+        for _source, _destination, target_relative, _attachments, _offset
+        in attachment_offset_jobs
+    )
+    staged_files.extend(
+        target_relative
+        for (
+            _primary,
+            _secondary,
+            _destination,
+            target_relative,
+            _required_groups,
+            _mode,
+        )
+        in composition_jobs
+    )
+    deployment_progress.complete("model_patch", "Compiled default models ready")
 
     def language_progress(operation: str, completed: int, total: int) -> None:
         phase = "language_stage" if operation == "stage" else "language_extract"

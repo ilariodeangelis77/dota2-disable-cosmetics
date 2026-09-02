@@ -295,32 +295,36 @@ not available.
    a reviewable mapping report.
 3. Only required resources and English localization compatibility files are extracted.
 4. Skin-sensitive model copies receive duplicate base-material groups when a selected style index
-   would otherwise render an error material. Geometry, skeleton, animation, dependency, and other
-   opaque resource blocks remain byte-identical.
+   would otherwise render an error material. Reviewed model-less wearable proxies can use composed
+   compatible defaults. Original mesh and vertex-buffer blocks remain byte-identical.
 5. The helper creates the numbered VPK, reopens every packed entry, and validates its CRC before
    deployment.
 6. The application records the archive checksum, selected categories, mount, and Dota build in an
    ownership marker and local history.
 
 The VPK helper uses
-[ValvePak 4.0.0.142](https://github.com/ValveResourceFormat/ValvePak). The model material-group
-helper uses
+[ValvePak 4.0.0.142](https://github.com/ValveResourceFormat/ValvePak). The model helper uses
 [ValveResourceFormat 15.0.4937](https://github.com/ValveResourceFormat/ValveResourceFormat).
 Both are bundled under the MIT License; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Validation status
 
-The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25002408`
-on 2026-08-30. A non-deploying audit packed, reopened, and CRC-validated 16,440 entries with no
+The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25071102`
+on 2026-09-02. A non-deploying audit packed, reopened, and CRC-validated 16,471 entries with no
 missing final source resources:
 
 | Resource type | Mappings |
 | --- | ---: |
-| Models | 10,860 |
+| Models | 10,890 |
 | Materials | 112 |
 | Particles | 5,227 |
 | Particle snapshots | 241 |
+
+The model total includes eight reviewed two-part compositions: Mirana's Dark Moon Back target and
+seven current Invoker Persona head targets. Invoker's compositions preserve the adult face morph
+data while combining the adult hair and face on one Persona hook. One additional hidden Invoker
+loadout model is included to raise the three orb attachments to adult height.
 
 An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
 recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
@@ -328,8 +332,12 @@ recognized Dutch mount was confirmed to apply overrides in the Armory and Demo H
 still require another representative in-game visual pass. On 2026-09-01, a refreshed all-category
 build for Steam build `25002408` restored Crystal Maiden's wolf Persona with its human hair, cape,
 shoulders, staff, and correct-looking stance; that specific Persona was confirmed in the live
-client. These results must not be interpreted as proof that every cosmetic or Persona works with
-the current live game.
+client. Mirana's Dark Moon Back composition and Anti-Mage's normal body, chest, head, and dual
+glaives were also confirmed in the live client on 2026-09-02. These results must not be interpreted
+as proof that every cosmetic or Persona works with the current live game. Invoker's reviewed
+profile now composes the adult hair and morph-enabled face onto every current Persona head target,
+uses the freed shoulder hook for the adult shoulders, and raises the Kid-only loadout orb rig to
+adult height; that adjustment still needs a focused live-client recheck.
 
 ## Development
 

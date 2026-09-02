@@ -550,6 +550,325 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
         self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
 
+    def test_antimage_persona_uses_reviewed_normal_wearable_slots(self):
+        hero = "npc_dota_hero_antimage"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/antimage/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("weapon", "antimage_weapon"),
+                    ("offhand_weapon", "antimage_offhand_weapon"),
+                    ("head", "antimage_head"),
+                    ("armor", "antimage_chest"),
+                    ("arms", "antimage_arms"),
+                    ("belt", "antimage_belt"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/antimage_female/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "weapon_persona_1",
+                    "offhand_weapon_persona_1",
+                    "head_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/antimage_female/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "weapon_persona_1",
+                    "offhand_weapon_persona_1",
+                    "head_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": (
+                        "models/heroes/antimage_female/antimage_female.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/antimage/antimage.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "weapon_persona_1": "models/heroes/antimage/antimage_weapon.vmdl",
+            "offhand_weapon_persona_1": (
+                "models/heroes/antimage/antimage_offhand_weapon.vmdl"
+            ),
+            "head_persona_1": "models/heroes/antimage/antimage_head.vmdl",
+            "armor_persona_1": "models/heroes/antimage/antimage_chest.vmdl",
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    f"models/heroes/antimage_female/default_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[
+                    f"models/items/antimage_female/cosmetic_{slot}.vmdl"
+                ].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target["models/heroes/antimage_female/antimage_female.vmdl"].source,
+            "models/heroes/antimage/antimage.vmdl",
+        )
+        mapping_sources = {mapping.source for mapping in plan.mappings}
+        self.assertNotIn("models/heroes/antimage/antimage_arms.vmdl", mapping_sources)
+        self.assertNotIn("models/heroes/antimage/antimage_belt.vmdl", mapping_sources)
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 8)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 4)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+
+    def test_invoker_persona_restores_adult_wearables_and_forge_spirit(self):
+        hero = "npc_dota_hero_invoker"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/invoker/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("body_head", "invoker_head"),
+                    ("head", "invoker_hair"),
+                    ("shoulder", "invoker_shoulder"),
+                    ("back", "invoker_cape"),
+                    ("arms", "invoker_bracer"),
+                    ("belt", "invoker_dress"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=(
+                    None
+                    if slot == "armor_persona_1"
+                    else f"models/heroes/invoker_kid/default_{slot}.vmdl"
+                ),
+                visuals=(
+                    [
+                        {
+                            "type": "particle_create",
+                            "modifier": (
+                                "particles/units/heroes/hero_invoker_kid/"
+                                "invoker_kid_orbs_loadout.vpcf"
+                            ),
+                        }
+                    ]
+                    if slot == "head_persona_1"
+                    else None
+                ),
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "shoulder_persona_1",
+                    "back_persona_1",
+                    "arms_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/invoker_kid/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "head_persona_1",
+                    "shoulder_persona_1",
+                    "back_persona_1",
+                    "arms_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": "models/heroes/invoker_kid/invoker_kid.vmdl",
+                }
+            ],
+        )
+        summon = item(
+            31,
+            hero=hero,
+            slot="summon_persona_1",
+            baseitem="1",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": "npc_dota_invoker_forged_spirit",
+                    "modifier": (
+                        "models/heroes/invoker_kid/"
+                        "invoker_kid_trainer_dragon.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+                summon,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/invoker/invoker.vmdl"},
+            [],
+            unit_models={
+                "npc_dota_invoker_forged_spirit": (
+                    "models/heroes/invoker/forge_spirit.vmdl"
+                )
+            },
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "head_persona_1": "models/heroes/invoker/invoker_hair.vmdl",
+            "shoulder_persona_1": "models/heroes/invoker/invoker_shoulder.vmdl",
+            "back_persona_1": "models/heroes/invoker/invoker_cape.vmdl",
+            "arms_persona_1": "models/heroes/invoker/invoker_dress.vmdl",
+            "armor_persona_1": (
+                "models/heroes/invoker/invoker_bracer.vmdl"
+            ),
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    f"models/items/invoker_kid/cosmetic_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            if slot != "armor_persona_1":
+                self.assertEqual(
+                    by_target[
+                        f"models/heroes/invoker_kid/default_{slot}.vmdl"
+                    ].source,
+                    source,
+                )
+
+        self.assertEqual(
+            by_target["models/heroes/invoker_kid/invoker_kid.vmdl"].source,
+            "models/heroes/invoker/invoker.vmdl",
+        )
+        self.assertEqual(
+            by_target[
+                "models/heroes/invoker_kid/invoker_kid_trainer_dragon.vmdl"
+            ].source,
+            "models/heroes/invoker/forge_spirit.vmdl",
+        )
+        self.assertEqual(len(plan.model_compositions), 2)
+        self.assertEqual(
+            {composition.target for composition in plan.model_compositions},
+            {
+                "models/heroes/invoker_kid/default_head_persona_1.vmdl",
+                "models/items/invoker_kid/cosmetic_head_persona_1.vmdl",
+            },
+        )
+        for composition in plan.model_compositions:
+            self.assertEqual(
+                composition.primary_source,
+                "models/heroes/invoker/invoker_hair.vmdl",
+            )
+            self.assertEqual(
+                composition.secondary_source,
+                "models/heroes/invoker/invoker_head.vmdl",
+            )
+            self.assertEqual(composition.slot, "head_persona_1")
+            self.assertEqual(composition.mode, "skeleton-overlay")
+        self.assertEqual(len(plan.model_attachment_offsets), 1)
+        adjustment = plan.model_attachment_offsets[0]
+        self.assertEqual(
+            adjustment.source,
+            "models/heroes/invoker_kid/invoker_kid_orbs_loadout.vmdl",
+        )
+        self.assertEqual(adjustment.target, adjustment.source)
+        self.assertEqual(
+            adjustment.attachments,
+            ("attach_orb1", "attach_orb2", "attach_orb3"),
+        )
+        self.assertEqual(adjustment.offset, (0.0, 0.0, 40.0))
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 9)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 6)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_planned"], 2)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_attachment_offsets_planned"], 1)
+        self.assertEqual(plan.stats["persona_attachment_offsets_unresolved"], 0)
+
     def test_pudge_persona_uses_reviewed_normal_wearable_slots(self):
         hero = "npc_dota_hero_pudge"
         normal_defaults = tuple(
@@ -856,6 +1175,261 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profiles_validated"], 0)
         self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
         self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 1)
+
+    def test_mirana_persona_restores_mount_and_reviewed_normal_slots(self):
+        hero = "npc_dota_hero_mirana"
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/mirana/{model}.vmdl",
+            )
+            for index, (slot, model) in enumerate(
+                (
+                    ("mount", "mount"),
+                    ("weapon", "bow"),
+                    ("head", "head_item"),
+                    ("back", "cape"),
+                    ("shoulder", "shoulders"),
+                    ("arms", "bracers"),
+                    ("misc", "quiver"),
+                ),
+                start=1,
+            )
+        )
+        persona_defaults = tuple(
+            item(
+                10 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=f"models/heroes/mirana_persona/default_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "mount_persona_1",
+                    "weapon_persona_1",
+                    "head_persona_1",
+                    "back_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        persona_cosmetics = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                model=f"models/items/mirana_persona/cosmetic_{slot}.vmdl",
+            )
+            for index, slot in enumerate(
+                (
+                    "mount_persona_1",
+                    "weapon_persona_1",
+                    "head_persona_1",
+                    "back_persona_1",
+                    "armor_persona_1",
+                )
+            )
+        )
+        selector = item(
+            30,
+            hero=hero,
+            slot="persona_selector",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": hero,
+                    "modifier": (
+                        "models/heroes/mirana_persona/mirana_persona_base.vmdl"
+                    ),
+                }
+            ],
+        )
+        dark_moon_armor = item(
+            18556,
+            hero=hero,
+            slot="armor_persona_1",
+            model=(
+                "models/items/mirana_persona/dark_moon_armor/"
+                "dark_moon_armor.vmdl"
+            ),
+            visuals=[
+                {
+                    "type": "activity",
+                    "asset": "ALL",
+                    "modifier": "dark_moon",
+                },
+                {
+                    "type": "model",
+                    "asset": (
+                        "models/heroes/mirana_persona/default_back_persona_1.vmdl"
+                    ),
+                    "modifier": (
+                        "models/items/mirana_persona/dark_moon_armor/"
+                        "mirana_persona_back_dark_moon_refit.vmdl"
+                    ),
+                },
+            ],
+        )
+        dark_moon_back = item(
+            18603,
+            hero=hero,
+            slot="back_persona_1",
+            visuals=[
+                {
+                    "type": "model",
+                    "asset": (
+                        "models/heroes/mirana_persona/default_head_persona_1.vmdl"
+                    ),
+                    "modifier": (
+                        "models/items/mirana_persona/dark_moon_armor/"
+                        "mirana_persona_head_dark_moon_refit.vmdl"
+                    ),
+                }
+            ],
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                *persona_cosmetics,
+                selector,
+                dark_moon_armor,
+                dark_moon_back,
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/mirana/mirana.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        expected_sources = {
+            "mount_persona_1": "models/heroes/mirana/mount.vmdl",
+            "weapon_persona_1": "models/heroes/mirana/bow.vmdl",
+            "head_persona_1": "models/heroes/mirana/head_item.vmdl",
+            "back_persona_1": "models/heroes/mirana/cape.vmdl",
+            "armor_persona_1": "models/heroes/mirana/shoulders.vmdl",
+        }
+        for slot, source in expected_sources.items():
+            self.assertEqual(
+                by_target[
+                    f"models/heroes/mirana_persona/default_{slot}.vmdl"
+                ].source,
+                source,
+            )
+            self.assertEqual(
+                by_target[f"models/items/mirana_persona/cosmetic_{slot}.vmdl"].source,
+                source,
+            )
+
+        self.assertEqual(
+            by_target[
+                "models/heroes/mirana_persona/mirana_persona_base.vmdl"
+            ].source,
+            "models/heroes/mirana/mirana.vmdl",
+        )
+        self.assertEqual(
+            by_target[
+                "models/items/mirana_persona/dark_moon_armor/"
+                "mirana_persona_back_dark_moon_refit.vmdl"
+            ].source,
+            "models/heroes/mirana/cape.vmdl",
+        )
+        self.assertEqual(
+            by_target[
+                "models/items/mirana_persona/dark_moon_armor/"
+                "mirana_persona_head_dark_moon_refit.vmdl"
+            ].source,
+            "models/heroes/mirana/head_item.vmdl",
+        )
+        self.assertEqual(len(plan.model_compositions), 1)
+        composition = plan.model_compositions[0]
+        self.assertEqual(composition.item_id, "18603")
+        self.assertEqual(composition.hero, hero)
+        self.assertEqual(composition.slot, "back_persona_1")
+        self.assertEqual(composition.category, generator.CATEGORY_PERSONA_MODELS)
+        self.assertEqual(
+            composition.primary_source,
+            "models/heroes/mirana/head_item.vmdl",
+        )
+        self.assertEqual(
+            composition.secondary_source,
+            "models/heroes/mirana/cape.vmdl",
+        )
+        self.assertEqual(
+            composition.target,
+            (
+                "models/items/mirana_persona/dark_moon_armor/"
+                "mirana_persona_head_dark_moon_refit.vmdl"
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            report_path = Path(temporary) / "model-plan.json"
+            generator.write_plan(plan, report_path)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            report["model_compositions"],
+            [
+                {
+                    "primary_source": composition.primary_source,
+                    "secondary_source": composition.secondary_source,
+                    "target": composition.target,
+                    "reason": composition.reason,
+                    "category": composition.category,
+                    "item_id": composition.item_id,
+                    "hero": composition.hero,
+                    "slot": composition.slot,
+                    "mode": "shared-root",
+                }
+            ],
+        )
+        mapping_sources = {mapping.source for mapping in plan.mappings}
+        self.assertNotIn("models/heroes/mirana/bracers.vmdl", mapping_sources)
+        self.assertNotIn("models/heroes/mirana/quiver.vmdl", mapping_sources)
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 11)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 5)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_planned"], 1)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
+
+        unreviewed_back = item(
+            99999,
+            hero=hero,
+            slot="back_persona_1",
+            visuals=list(dark_moon_back.visuals),
+        )
+        without_reviewed_item = {
+            item_id: record
+            for item_id, record in records.items()
+            if item_id != dark_moon_back.item_id
+        }
+        without_reviewed_item[unreviewed_back.item_id] = unreviewed_back
+        unreviewed_plan = generator.build_plan(
+            {},
+            without_reviewed_item,
+            {hero: "models/heroes/mirana/mirana.vmdl"},
+            [],
+        )
+        self.assertEqual(unreviewed_plan.model_compositions, [])
+        self.assertEqual(
+            unreviewed_plan.stats["persona_model_compositions_unresolved"],
+            1,
+        )
+        self.assertTrue(
+            any(
+                entry.get("type") == "persona_model_composition"
+                and entry.get("item_id") == "18603"
+                for entry in unreviewed_plan.unresolved
+            )
+        )
 
     def test_persona_profile_reports_schema_drift_and_falls_back_conservatively(self):
         hero = "npc_dota_hero_crystal_maiden"
@@ -1236,6 +1810,16 @@ class MappingTests(unittest.TestCase):
             neutralize_model_skin=True,
             required_material_groups=2,
         )
+        composition = generator.ModelComposition(
+            primary_source="models/heroes/test/default_head.vmdl",
+            secondary_source="models/heroes/test/default_back.vmdl",
+            target="models/items/test/composed_head.vmdl",
+            reason="reviewed test composition",
+            category=generator.CATEGORY_PERSONA_MODELS,
+            item_id="3",
+            hero=HERO,
+            slot="head_persona_1",
+        )
         plan = generator.Plan(
             mappings=[mapping],
             unresolved=[],
@@ -1244,6 +1828,7 @@ class MappingTests(unittest.TestCase):
                 "mapping_conflicts": 0,
                 "unresolved": 0,
             },
+            model_compositions=[composition],
         )
         with tempfile.TemporaryDirectory() as temporary:
             cache = Path(temporary)
@@ -1265,6 +1850,7 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(materials[0].target, "materials/models/items/event/test/head.vmat")
         self.assertEqual(adjusted.stats["material_overrides"], 1)
         self.assertEqual(adjusted.stats["alternate_skin_group_patch_targets"], 1)
+        self.assertEqual(adjusted.model_compositions, [composition])
 
     def test_single_material_skin_keeps_a_distinct_default_model_replacement(self):
         mapping = generator.Mapping(
@@ -2183,6 +2769,168 @@ class GuiViewModelTests(unittest.TestCase):
 
 
 class ModelPatcherDiscoveryTests(unittest.TestCase):
+    def test_attachment_offset_result_is_verified(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.vmdl_c"
+            destination = root / "output" / "adjusted.vmdl_c"
+            source.write_bytes(b"source")
+
+            def fake_run(command, *, quiet):
+                self.assertTrue(quiet)
+                destination.write_bytes(b"verified adjusted model")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "attachments": 3,
+                            "offset_x": 0,
+                            "offset_y": 0,
+                            "offset_z": 40,
+                            "output_bytes": destination.stat().st_size,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run) as run_helper:
+                model_patcher.offset_model_attachments(
+                    root / "patcher.exe",
+                    source,
+                    destination,
+                    ("attach_orb1", "attach_orb2", "attach_orb3"),
+                    (0.0, 0.0, 40.0),
+                    progress=lambda _message: None,
+                )
+
+        self.assertEqual(
+            run_helper.call_args.args[0],
+            [
+                str(root / "patcher.exe"),
+                "offset-attachments",
+                "--input",
+                str(source),
+                "--output",
+                str(destination),
+                "--attachments",
+                "attach_orb1,attach_orb2,attach_orb3",
+                "--offset-x",
+                "0",
+                "--offset-y",
+                "0",
+                "--offset-z",
+                "40",
+            ],
+        )
+
+    def test_composed_model_result_is_verified(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            primary = root / "primary.vmdl_c"
+            secondary = root / "secondary.vmdl_c"
+            destination = root / "output" / "composed.vmdl_c"
+            primary.write_bytes(b"primary")
+            secondary.write_bytes(b"secondary")
+
+            def fake_run(command, *, quiet):
+                self.assertTrue(quiet)
+                destination.write_bytes(b"verified composed model")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "mode": "shared-root",
+                            "primary_meshes": 2,
+                            "secondary_meshes": 2,
+                            "output_meshes": 4,
+                            "primary_bones": 12,
+                            "secondary_bones": 9,
+                            "shared_bones": 1,
+                            "output_bones": 20,
+                            "remapped_bone_references": 8,
+                            "output_references": 2,
+                            "output_bytes": destination.stat().st_size,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run) as run_helper:
+                model_patcher.compose_models(
+                    root / "patcher.exe",
+                    primary,
+                    secondary,
+                    destination,
+                    progress=lambda _message: None,
+                )
+
+        command = run_helper.call_args.args[0]
+        self.assertEqual(
+            command,
+            [
+                str(root / "patcher.exe"),
+                "compose",
+                "--primary",
+                str(primary),
+                "--secondary",
+                str(secondary),
+                "--output",
+                str(destination),
+                "--mode",
+                "shared-root",
+            ],
+        )
+
+    def test_skeleton_overlay_composition_accepts_a_shared_bone_subset(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            primary = root / "hair.vmdl_c"
+            secondary = root / "face.vmdl_c"
+            destination = root / "combined.vmdl_c"
+            primary.write_bytes(b"hair")
+            secondary.write_bytes(b"face")
+
+            def fake_run(command, *, quiet):
+                self.assertTrue(quiet)
+                destination.write_bytes(b"hair and face")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "mode": "skeleton-overlay",
+                            "primary_meshes": 2,
+                            "secondary_meshes": 2,
+                            "output_meshes": 4,
+                            "primary_bones": 10,
+                            "secondary_bones": 7,
+                            "shared_bones": 7,
+                            "output_bones": 10,
+                            "remapped_bone_references": 20,
+                            "output_references": 3,
+                            "output_bytes": destination.stat().st_size,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run) as run_helper:
+                model_patcher.compose_models(
+                    root / "patcher.exe",
+                    primary,
+                    secondary,
+                    destination,
+                    mode="skeleton-overlay",
+                    progress=lambda _message: None,
+                )
+
+        self.assertEqual(
+            run_helper.call_args.args[0][-2:],
+            ["--mode", "skeleton-overlay"],
+        )
+
     def test_current_model_patcher_version_is_accepted(self):
         process = subprocess.CompletedProcess(
             [],
@@ -2207,7 +2955,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.1\.1.*0\.1\.0",
+                r"Expected 0\.4\.0.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))
@@ -2273,6 +3021,37 @@ class DeploymentTests(unittest.TestCase):
             ],
             unresolved=[],
             stats={},
+        )
+
+    def make_composition_plan(self):
+        composition = generator.ModelComposition(
+            primary_source="models/heroes/test/head.vmdl",
+            secondary_source="models/heroes/test/cape.vmdl",
+            target="models/items/test/composed.vmdl",
+            reason="reviewed test composition",
+            category=generator.CATEGORY_PERSONA_MODELS,
+            item_id="10",
+            hero=HERO,
+            slot="back_persona_1",
+        )
+        return (
+            generator.Plan(
+                mappings=[
+                    generator.Mapping(
+                        source=composition.primary_source,
+                        target=composition.target,
+                        reason="ordinary fallback",
+                        category=composition.category,
+                        item_id=composition.item_id,
+                        hero=composition.hero,
+                        slot=composition.slot,
+                    )
+                ],
+                unresolved=[],
+                stats={},
+                model_compositions=[composition],
+            ),
+            composition,
         )
 
     def test_operation_lock_rejects_an_overlapping_build_or_cleanup(self):
@@ -2406,6 +3185,7 @@ class DeploymentTests(unittest.TestCase):
                     clean_first=True,
                     allow_missing=False,
                     language="dutch",
+                    progress=lambda _message: None,
                 )
 
             self.assertEqual((copied, missing), (1, []))
@@ -2422,6 +3202,217 @@ class DeploymentTests(unittest.TestCase):
                 (unpacked / "models/items/test/skinned.vmdl_c").read_bytes(),
                 b"compiled model;groups=3",
             )
+
+    def test_composed_model_replaces_ordinary_fallback_before_vpk_packaging(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        plan, composition = self.make_composition_plan()
+        target = composition.target
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            primary = cache / generator.compiled_model_path(
+                composition.primary_source
+            )
+            secondary = cache / generator.compiled_model_path(
+                composition.secondary_source
+            )
+            primary.parent.mkdir(parents=True)
+            secondary.parent.mkdir(parents=True, exist_ok=True)
+            primary.write_bytes(b"ordinary head fallback")
+            secondary.write_bytes(b"cape")
+            output = root / "dota_dutch"
+
+            def fake_compose(
+                _patcher,
+                primary_source,
+                secondary_source,
+                destination,
+                *,
+                mode,
+                progress,
+            ):
+                self.assertTrue(os.path.samefile(primary_source, primary))
+                self.assertTrue(os.path.samefile(secondary_source, secondary))
+                self.assertEqual(mode, "shared-root")
+                destination.parent.mkdir(parents=True)
+                destination.write_bytes(b"verified head and cape composite")
+                progress("composed")
+
+            with patch(
+                "dota_disabler.deployment.compose_models",
+                side_effect=fake_compose,
+            ) as compose:
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual((copied, missing), (1, []))
+            compose.assert_called_once()
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            self.assertEqual(
+                marker["resources"],
+                [generator.compiled_model_path(target)],
+            )
+            unpacked = root / "unpacked-composition"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                marker["resources"],
+                unpacked,
+            )
+            self.assertEqual(
+                (
+                    unpacked / generator.compiled_model_path(target)
+                ).read_bytes(),
+                b"verified head and cape composite",
+            )
+
+    def test_attachment_offset_model_is_transformed_before_vpk_packaging(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        adjustment = generator.ModelAttachmentOffset(
+            source="models/heroes/test/orb_rig.vmdl",
+            target="models/heroes/test/orb_rig.vmdl",
+            attachments=("attach_orb1", "attach_orb2", "attach_orb3"),
+            offset=(0.0, 0.0, 40.0),
+            reason="reviewed test offset",
+            category=generator.CATEGORY_PERSONA_MODELS,
+            item_id="10",
+            hero=HERO,
+            slot="head_persona_1",
+        )
+        plan = generator.Plan(
+            mappings=[],
+            unresolved=[],
+            stats={},
+            model_attachment_offsets=[adjustment],
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            source = cache / generator.compiled_model_path(adjustment.source)
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"kid-height rig")
+            output = root / "dota_dutch"
+
+            def fake_offset(
+                _patcher,
+                source_path,
+                destination,
+                attachments,
+                offset,
+                *,
+                progress,
+            ):
+                self.assertTrue(os.path.samefile(source_path, source))
+                self.assertEqual(attachments, adjustment.attachments)
+                self.assertEqual(offset, adjustment.offset)
+                destination.parent.mkdir(parents=True)
+                destination.write_bytes(b"adult-height rig")
+                progress("adjusted")
+
+            with patch(
+                "dota_disabler.deployment.offset_model_attachments",
+                side_effect=fake_offset,
+            ) as offset_model:
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual((copied, missing), (1, []))
+            offset_model.assert_called_once()
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            unpacked = root / "unpacked-offset"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                marker["resources"],
+                unpacked,
+            )
+            self.assertEqual(
+                (
+                    unpacked / generator.compiled_model_path(adjustment.target)
+                ).read_bytes(),
+                b"adult-height rig",
+            )
+
+    def test_composed_deploy_refuses_to_run_without_model_helper(self):
+        plan, _composition = self.make_composition_plan()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / "dota_dutch"
+            with self.assertRaisesRegex(generator.GeneratorError, "model helper"):
+                generator.deploy_overrides(
+                    plan,
+                    root / "cache",
+                    output,
+                    root / "work",
+                    extractor=root / "extractor.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                )
+            self.assertFalse(output.exists())
+
+    def test_missing_composition_source_aborts_before_packaging(self):
+        plan, composition = self.make_composition_plan()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            primary = cache / generator.compiled_model_path(
+                composition.primary_source
+            )
+            primary.parent.mkdir(parents=True)
+            primary.write_bytes(b"head")
+            output = root / "dota_dutch"
+
+            with self.assertRaisesRegex(
+                generator.GeneratorError,
+                "source resource.*not extracted",
+            ):
+                generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=root / "extractor.exe",
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                )
+
+            missing = json.loads(
+                (root / "work" / "missing-resources.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(len(missing), 1)
+            self.assertEqual(missing[0]["source"], composition.secondary_source)
+            self.assertEqual(missing[0]["target"], composition.target)
+            self.assertEqual(missing[0]["composition_role"], "secondary")
+            self.assertFalse(output.exists())
 
     def test_skin_sensitive_deploy_refuses_to_run_without_model_patcher(self):
         plan = generator.Plan(

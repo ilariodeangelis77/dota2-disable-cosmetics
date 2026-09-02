@@ -1,4 +1,4 @@
-"""Discovery and invocation of the bundled Source 2 model skin patcher."""
+"""Discovery and invocation of the bundled Source 2 compiled-model helper."""
 
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
-MODEL_PATCHER_VERSION = "0.1.1"
+MODEL_PATCHER_VERSION = "0.4.0"
+MODEL_COMPOSITION_MODES = frozenset({"shared-root", "skeleton-overlay"})
 
 
 def find_model_patcher(explicit: Optional[str] = None) -> Path:
@@ -29,7 +30,7 @@ def find_model_patcher(explicit: Optional[str] = None) -> Path:
             candidate /= executable_name
         if candidate.is_file():
             return candidate
-        raise FileNotFoundError(f"Internal model skin patcher not found: {candidate}")
+        raise FileNotFoundError(f"Internal model helper not found: {candidate}")
 
     override = os.environ.get("DOTA_DISABLE_COSMETICS_MODEL_PATCHER")
     candidates: list[Path] = []
@@ -114,6 +115,127 @@ def patch_model_material_groups(
         ) from exc
 
 
+def compose_models(
+    patcher: Path,
+    primary_source: Path,
+    secondary_source: Path,
+    destination: Path,
+    *,
+    mode: str = "shared-root",
+    progress: ProgressCallback = print,
+) -> None:
+    """Compose two compatible compiled models and verify the helper result."""
+
+    if mode not in MODEL_COMPOSITION_MODES:
+        raise ValueError(f"Unsupported model composition mode: {mode}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    progress(f"Composing compatible default models: {destination.name}")
+    process = run(
+        [
+            str(patcher),
+            "compose",
+            "--primary",
+            str(primary_source),
+            "--secondary",
+            str(secondary_source),
+            "--output",
+            str(destination),
+            "--mode",
+            mode,
+        ],
+        quiet=True,
+    )
+    try:
+        result = json.loads(process.stdout or "")
+        primary_meshes = int(result["primary_meshes"])
+        secondary_meshes = int(result["secondary_meshes"])
+        output_meshes = int(result["output_meshes"])
+        primary_bones = int(result["primary_bones"])
+        secondary_bones = int(result["secondary_bones"])
+        shared_bones = int(result["shared_bones"])
+        output_bones = int(result["output_bones"])
+        remapped_bone_references = int(result["remapped_bone_references"])
+        output_references = int(result["output_references"])
+        output_bytes = int(result["output_bytes"])
+        if (
+            result["mode"] != mode
+            or primary_meshes < 1
+            or secondary_meshes < 1
+            or output_meshes != primary_meshes + secondary_meshes
+            or primary_bones < 1
+            or secondary_bones < 1
+            or shared_bones
+            != (1 if mode == "shared-root" else secondary_bones)
+            or output_bones != primary_bones + secondary_bones - shared_bones
+            or remapped_bone_references < 0
+            or (mode == "skeleton-overlay" and remapped_bone_references == 0)
+            or output_references < 0
+            or not destination.is_file()
+            or output_bytes != destination.stat().st_size
+        ):
+            raise ValueError("inconsistent model composition verification")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise GeneratorError(
+            "The internal model helper returned an invalid composition result."
+        ) from exc
+
+
+def offset_model_attachments(
+    patcher: Path,
+    source: Path,
+    destination: Path,
+    attachments: tuple[str, ...],
+    offset: tuple[float, float, float],
+    *,
+    progress: ProgressCallback = print,
+) -> None:
+    """Translate reviewed attachment points and verify the helper result."""
+
+    if not attachments or any(not name.strip() for name in attachments):
+        raise ValueError("At least one valid attachment name is required.")
+    if len(offset) != 3 or not any(offset):
+        raise ValueError("A non-zero three-axis attachment offset is required.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    progress(f"Adjusting reviewed model attachments: {destination.name}")
+    process = run(
+        [
+            str(patcher),
+            "offset-attachments",
+            "--input",
+            str(source),
+            "--output",
+            str(destination),
+            "--attachments",
+            ",".join(attachments),
+            "--offset-x",
+            format(offset[0], ".17g"),
+            "--offset-y",
+            format(offset[1], ".17g"),
+            "--offset-z",
+            format(offset[2], ".17g"),
+        ],
+        quiet=True,
+    )
+    try:
+        result = json.loads(process.stdout or "")
+        reported_offset = (
+            float(result["offset_x"]),
+            float(result["offset_y"]),
+            float(result["offset_z"]),
+        )
+        if (
+            int(result["attachments"]) != len(attachments)
+            or reported_offset != offset
+            or not destination.is_file()
+            or int(result["output_bytes"]) != destination.stat().st_size
+        ):
+            raise ValueError("inconsistent model attachment-offset verification")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise GeneratorError(
+            "The internal model helper returned an invalid attachment-offset result."
+        ) from exc
+
+
 def patch_model_material_groups_batch(
     patcher: Path,
     requests: Iterable[tuple[Path, Path, int]],
@@ -174,7 +296,9 @@ def patch_model_material_groups_batch(
 
 __all__ = [
     "MODEL_PATCHER_VERSION",
+    "compose_models",
     "find_model_patcher",
+    "offset_model_attachments",
     "patch_model_material_groups",
     "patch_model_material_groups_batch",
     "validate_model_patcher",

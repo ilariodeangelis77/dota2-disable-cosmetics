@@ -112,6 +112,18 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         "persona_profile_slots_unresolved": counters[
             "persona_profile_slots_unresolved"
         ],
+        "persona_model_compositions_planned": counters[
+            "persona_model_compositions_planned"
+        ],
+        "persona_model_compositions_unresolved": counters[
+            "persona_model_compositions_unresolved"
+        ],
+        "persona_attachment_offsets_planned": counters[
+            "persona_attachment_offsets_planned"
+        ],
+        "persona_attachment_offsets_unresolved": counters[
+            "persona_attachment_offsets_unresolved"
+        ],
         "alternate_skin_models_skipped": counters["alternate_skin_models_skipped"],
         "entity_default_replacements": counters["entity_default_replacements"],
         "pet_models_hidden": counters["pet_models_hidden"],
@@ -125,6 +137,18 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         mappings=mappings,
         unresolved=context.unresolved,
         stats=stats,
+        model_compositions=sorted(
+            context.model_compositions,
+            key=lambda composition: (
+                composition.target,
+                composition.primary_source,
+                composition.secondary_source,
+            ),
+        ),
+        model_attachment_offsets=sorted(
+            context.model_attachment_offsets,
+            key=lambda adjustment: (adjustment.target, adjustment.source),
+        ),
     )
 
 

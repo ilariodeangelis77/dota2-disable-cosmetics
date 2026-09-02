@@ -9,11 +9,66 @@ from unittest.mock import patch
 
 from dota_disabler import application
 from dota_disabler.constants import CATEGORY_STANDARD_WEARABLES
-from dota_disabler.domain import BuildOptions, Plan
+from dota_disabler.domain import (
+    BuildOptions,
+    ModelAttachmentOffset,
+    ModelComposition,
+    Plan,
+)
 from dota_disabler.errors import GeneratorError
 
 
 class BuildOrchestrationTests(unittest.TestCase):
+    def test_attachment_offset_source_is_included_in_vpk_extraction(self):
+        adjustment = ModelAttachmentOffset(
+            source="models/heroes/test/loadout_rig.vmdl",
+            target="models/heroes/test/loadout_rig.vmdl",
+            attachments=("attach_orb1",),
+            offset=(0.0, 0.0, 40.0),
+            reason="reviewed test offset",
+            category="persona_models",
+            item_id="10",
+            hero="npc_dota_hero_test",
+            slot="head_persona_1",
+        )
+        plan = Plan(
+            mappings=[],
+            unresolved=[],
+            stats={},
+            model_attachment_offsets=[adjustment],
+        )
+
+        self.assertEqual(
+            application._source_resources_for_plan(plan),
+            {"models/heroes/test/loadout_rig.vmdl_c"},
+        )
+
+    def test_composition_sources_are_included_in_vpk_extraction(self):
+        composition = ModelComposition(
+            primary_source="models/heroes/test/head.vmdl",
+            secondary_source="models/heroes/test/cape.vmdl",
+            target="models/items/test/composed.vmdl",
+            reason="reviewed test composition",
+            category="persona_models",
+            item_id="10",
+            hero="npc_dota_hero_test",
+            slot="back_persona_1",
+        )
+        plan = Plan(
+            mappings=[],
+            unresolved=[],
+            stats={},
+            model_compositions=[composition],
+        )
+
+        self.assertEqual(
+            application._source_resources_for_plan(plan),
+            {
+                "models/heroes/test/head.vmdl_c",
+                "models/heroes/test/cape.vmdl_c",
+            },
+        )
+
     def test_successful_build_reports_monotonic_stage_progress(self):
         dota_version = {
             "steam_build_id": "100",

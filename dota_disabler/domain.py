@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -53,11 +53,43 @@ class Mapping:
     neutralize_bodygroup: bool = False
 
 
+@dataclass(frozen=True)
+class ModelComposition:
+    """Build one compiled model from two reviewed, compatible source models."""
+
+    primary_source: str
+    secondary_source: str
+    target: str
+    reason: str
+    category: str
+    item_id: str
+    hero: str
+    slot: str
+    mode: str = "shared-root"
+
+
+@dataclass(frozen=True)
+class ModelAttachmentOffset:
+    """Translate named attachments in one reviewed compiled model."""
+
+    source: str
+    target: str
+    attachments: tuple[str, ...]
+    offset: tuple[float, float, float]
+    reason: str
+    category: str
+    item_id: str
+    hero: str
+    slot: str
+
+
 @dataclass
 class Plan:
     mappings: list[Mapping]
     unresolved: list[dict]
     stats: dict[str, int]
+    model_compositions: list[ModelComposition] = field(default_factory=list)
+    model_attachment_offsets: list[ModelAttachmentOffset] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -98,6 +130,8 @@ __all__ = [
     "CleanResult",
     "ItemRecord",
     "Mapping",
+    "ModelAttachmentOffset",
+    "ModelComposition",
     "Plan",
     "ProgressCallback",
     "ProgressUpdateCallback",

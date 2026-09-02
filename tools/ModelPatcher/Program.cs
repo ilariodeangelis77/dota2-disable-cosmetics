@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.1.1";
+    private const string Version = "0.4.0";
 
     public static int Main(string[] args)
     {
@@ -29,14 +29,140 @@ internal static partial class Program
             {
                 return PatchBatch(args[1..]);
             }
+            if (args.Length > 0 && args[0] == "compose")
+            {
+                return ComposeModels(args[1..]);
+            }
+            if (args.Length > 0 && args[0] == "offset-attachments")
+            {
+                return OffsetModelAttachments(args[1..]);
+            }
             throw new ArgumentException(
-                "Expected --version, patch, or patch-batch.");
+                "Expected --version, patch, patch-batch, compose, or offset-attachments.");
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"ERROR: {exception.Message}");
             return 1;
         }
+    }
+
+    private static int OffsetModelAttachments(string[] args)
+    {
+        var options = ParseOptions(
+            args,
+            "--input",
+            "--output",
+            "--attachments",
+            "--offset-x",
+            "--offset-y",
+            "--offset-z");
+        var inputPath = RequireFile(options, "--input", ".vmdl_c");
+        var outputPath = Path.GetFullPath(RequireOption(options, "--output"));
+        if (!outputPath.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The model output filename must end with .vmdl_c.");
+        }
+        if (string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Input and output model paths must be different.");
+        }
+
+        var attachments = RequireOption(options, "--attachments")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (attachments.Length == 0 || attachments.Any(name => name.Length == 0))
+        {
+            throw new ArgumentException("At least one attachment name is required.");
+        }
+        var offset = new[]
+        {
+            ParseFiniteDouble(options, "--offset-x"),
+            ParseFiniteDouble(options, "--offset-y"),
+            ParseFiniteDouble(options, "--offset-z"),
+        };
+        if (offset.All(value => value == 0.0))
+        {
+            throw new ArgumentException("The attachment offset must not be zero.");
+        }
+
+        var result = ModelAttachmentOffsetter.Offset(
+            inputPath,
+            outputPath,
+            attachments,
+            offset);
+        Console.WriteLine(
+            $"{{\"attachments\":{result.Attachments},"
+            + $"\"offset_x\":{result.OffsetX.ToString(System.Globalization.CultureInfo.InvariantCulture)},"
+            + $"\"offset_y\":{result.OffsetY.ToString(System.Globalization.CultureInfo.InvariantCulture)},"
+            + $"\"offset_z\":{result.OffsetZ.ToString(System.Globalization.CultureInfo.InvariantCulture)},"
+            + $"\"output_bytes\":{result.OutputBytes}}}");
+        return 0;
+    }
+
+    private static double ParseFiniteDouble(
+        IReadOnlyDictionary<string, string> options,
+        string name)
+    {
+        if (!double.TryParse(
+                RequireOption(options, name),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value)
+            || !double.IsFinite(value))
+        {
+            throw new ArgumentException($"Required option is not a finite number: {name}");
+        }
+        return value;
+    }
+
+    private static int ComposeModels(string[] args)
+    {
+        var options = ParseOptions(
+            args,
+            "--primary",
+            "--secondary",
+            "--output",
+            "--mode");
+        var primaryPath = RequireFile(options, "--primary", ".vmdl_c");
+        var secondaryPath = RequireFile(options, "--secondary", ".vmdl_c");
+        var outputPath = Path.GetFullPath(RequireOption(options, "--output"));
+        if (!outputPath.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The model output filename must end with .vmdl_c.");
+        }
+        if (string.Equals(primaryPath, secondaryPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The primary and secondary models must be different files.");
+        }
+        if (string.Equals(primaryPath, outputPath, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(secondaryPath, outputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The composed output must not overwrite an input model.");
+        }
+
+        var modeName = options.GetValueOrDefault("--mode", "shared-root");
+        var mode = modeName switch
+        {
+            "shared-root" => ModelCompositionMode.SharedRoot,
+            "skeleton-overlay" => ModelCompositionMode.SkeletonOverlay,
+            _ => throw new ArgumentException($"Unsupported composition mode: {modeName}"),
+        };
+        var result = ModelComposer.Compose(primaryPath, secondaryPath, outputPath, mode);
+        Console.WriteLine(
+            $"{{\"mode\":\"{modeName}\","
+            + $"\"primary_meshes\":{result.PrimaryMeshes},"
+            + $"\"secondary_meshes\":{result.SecondaryMeshes},"
+            + $"\"output_meshes\":{result.OutputMeshes},"
+            + $"\"primary_bones\":{result.PrimaryBones},"
+            + $"\"secondary_bones\":{result.SecondaryBones},"
+            + $"\"shared_bones\":{result.SharedBones},"
+            + $"\"output_bones\":{result.OutputBones},"
+            + $"\"remapped_bone_references\":{result.RemappedBoneReferences},"
+            + $"\"output_references\":{result.OutputReferences},"
+            + $"\"output_bytes\":{result.OutputBytes}}}");
+        return 0;
     }
 
     private static int PatchBatch(string[] args)

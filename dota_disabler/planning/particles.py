@@ -72,7 +72,12 @@ def apply_missing_particle_fallbacks(
     stats["particle_missing_defaults_hidden"] = fallback_count
     stats["particle_virtual_defaults_neutralized"] = intentional_count
     stats["particle_unknown_defaults_neutralized"] = unknown_count
-    return Plan(mappings=adjusted, unresolved=list(plan.unresolved), stats=stats)
+    return replace(
+        plan,
+        mappings=adjusted,
+        unresolved=list(plan.unresolved),
+        stats=stats,
+    )
 
 
 __all__ = ["apply_missing_particle_fallbacks"]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
@@ -49,7 +50,12 @@ def apply_model_skin_material_fallbacks(
                 "alternate_skin_group_patch_targets": 0,
             }
         )
-        return Plan(mappings=list(plan.mappings), unresolved=list(plan.unresolved), stats=stats)
+        return replace(
+            plan,
+            mappings=list(plan.mappings),
+            unresolved=list(plan.unresolved),
+            stats=stats,
+        )
 
     mappings_by_source: dict[str, list[Mapping]] = {}
     for mapping in skin_mappings:
@@ -262,7 +268,7 @@ def apply_model_skin_material_fallbacks(
         stats[f"category_{category}"] = sum(
             mapping.category == category for mapping in mappings
         )
-    return Plan(mappings=mappings, unresolved=unresolved, stats=stats)
+    return replace(plan, mappings=mappings, unresolved=unresolved, stats=stats)
 
 
 __all__ = ["MATERIAL_REFERENCE_PATTERN", "apply_model_skin_material_fallbacks"]
