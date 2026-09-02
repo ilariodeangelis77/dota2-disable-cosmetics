@@ -344,8 +344,8 @@ adult height; that adjustment still needs a focused live-client recheck.
 Source development requires:
 
 - Python 3.10 or later with Tcl/Tk.
-- .NET 8 SDK for `tools/VpkExtractor`.
-- .NET 9 SDK for `tools/ModelPatcher`.
+- .NET 10 SDK for both compiled-resource helpers. The supported SDK feature band is pinned in
+  `global.json`.
 
 Build both helpers and run the source suite:
 

@@ -3,6 +3,8 @@ name: Cross-platform release builds
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -42,12 +44,10 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
 
-      - name: Set up .NET SDKs
+      - name: Set up .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
+          dotnet-version: 10.0.x
 
       - name: Install build dependencies
         run: python -m pip install -r requirements-build.txt

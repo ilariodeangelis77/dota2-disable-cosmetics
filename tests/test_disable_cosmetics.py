@@ -3006,7 +3006,7 @@ class DeploymentTests(unittest.TestCase):
             / "VpkExtractor"
             / "bin"
             / "Release"
-            / "net8.0"
+            / "net10.0"
             / executable
         )
 
@@ -3960,7 +3960,7 @@ class VpkExtractorIntegrationTests(unittest.TestCase):
             / "VpkExtractor"
             / "bin"
             / "Release"
-            / "net8.0"
+            / "net10.0"
             / executable
         )
 

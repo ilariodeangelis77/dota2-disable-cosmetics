@@ -36,7 +36,7 @@ def find_vpk_extractor(explicit: Optional[str]) -> Path:
         (
             runtime_asset_root() / "tools" / executable_name,
             project_root / "tools" / executable_name,
-            project_root / "tools/VpkExtractor/bin/Release/net8.0" / executable_name,
+            project_root / "tools/VpkExtractor/bin/Release/net10.0" / executable_name,
         )
     )
     found = shutil.which(executable_name)

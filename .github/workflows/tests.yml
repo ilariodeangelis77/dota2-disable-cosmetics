@@ -43,12 +43,10 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
 
-      - name: Set up .NET SDKs
+      - name: Set up .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
+          dotnet-version: 10.0.x
 
       - name: Build compiled-resource helpers
         shell: pwsh

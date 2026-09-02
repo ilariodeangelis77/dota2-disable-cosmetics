@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -47,6 +48,34 @@ class SteamDiscoveryContractTests(unittest.TestCase):
 
 
 class ReleaseWorkflowContractTests(unittest.TestCase):
+    def test_compiled_helpers_share_pinned_dotnet_10_toolchain(self):
+        sdk = json.loads((PROJECT_ROOT / "global.json").read_text(encoding="utf-8"))["sdk"]
+        self.assertEqual(sdk["version"], "10.0.400")
+        self.assertEqual(sdk["rollForward"], "latestPatch")
+        self.assertFalse(sdk["allowPrerelease"])
+
+        for project in (
+            "tools/VpkExtractor/VpkExtractor.csproj",
+            "tools/ModelPatcher/ModelPatcher.csproj",
+        ):
+            with self.subTest(project=project):
+                contents = (PROJECT_ROOT / project).read_text(encoding="utf-8")
+                self.assertIn("<TargetFramework>net10.0</TargetFramework>", contents)
+
+        for workflow_path in (
+            ".github/workflows/tests.yml",
+            ".github/workflows/build-releases.yml",
+        ):
+            with self.subTest(workflow=workflow_path):
+                workflow = (PROJECT_ROOT / workflow_path).read_text(encoding="utf-8")
+                self.assertIn("dotnet-version: 10.0.x", workflow)
+                self.assertNotIn("8.0.x", workflow)
+                self.assertNotIn("9.0.x", workflow)
+
+        script = (PROJECT_ROOT / "scripts/build_release.ps1").read_text(encoding="utf-8")
+        self.assertIn('".work/dotnet10/dotnet$executableSuffix"', script)
+        self.assertNotIn("dotnet9", script.lower())
+
     def test_desktop_progress_bar_uses_determinate_build_updates(self):
         gui = (PROJECT_ROOT / "dota_disabler/gui.py").read_text(encoding="utf-8")
 
@@ -72,6 +101,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
                 self.assertIn(f"archive: {archive}", workflow)
         self.assertIn("actions/upload-artifact@v6", workflow)
         self.assertIn("xvfb-run --auto-servernum", workflow)
+        self.assertIn("push:\n    branches:\n      - main\n    tags:", workflow)
 
     def test_tag_builds_create_only_a_verified_draft_release(self):
         workflow = (PROJECT_ROOT / ".github/workflows/build-releases.yml").read_text(

@@ -42,7 +42,7 @@ def find_model_patcher(explicit: Optional[str] = None) -> Path:
             runtime_asset_root() / "tools" / executable_name,
             project_root / "tools" / executable_name,
             project_root / "build/model-patcher" / executable_name,
-            project_root / "tools/ModelPatcher/bin/Release/net9.0" / executable_name,
+            project_root / "tools/ModelPatcher/bin/Release/net10.0" / executable_name,
         )
     )
     found = shutil.which(executable_name)

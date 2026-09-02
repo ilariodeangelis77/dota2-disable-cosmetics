@@ -55,17 +55,25 @@ $releaseName = "Dota2CosmeticDisabler-$version-$Runtime"
 $artifactsRoot = Join-Path $projectRoot "artifacts"
 $releaseDirectory = Join-Path $artifactsRoot $releaseName
 $releaseArchive = "$releaseDirectory$archiveExtension"
-$localDotnet9 = Join-Path $projectRoot ".work/dotnet9/dotnet$executableSuffix"
-$dotnet = (Get-Command dotnet -ErrorAction Stop).Source
-$dotnet9 = if (Test-Path -LiteralPath $localDotnet9 -PathType Leaf) {
-    $localDotnet9
+$localDotnet10 = Join-Path $projectRoot ".work/dotnet10/dotnet$executableSuffix"
+$dotnet = if (Test-Path -LiteralPath $localDotnet10 -PathType Leaf) {
+    $localDotnet10
 } else {
-    $dotnet
+    (Get-Command dotnet -ErrorAction Stop).Source
 }
 $previousTestExtractor = $env:DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR
 
 Push-Location $projectRoot
 try {
+    $dotnetSdkVersion = & $dotnet --version
+    if (
+        $LASTEXITCODE -ne 0 `
+        -or @($dotnetSdkVersion).Count -ne 1 `
+        -or -not $dotnetSdkVersion.Trim().StartsWith("10.0.", [StringComparison]::Ordinal)
+    ) {
+        throw "The .NET 10 SDK is required to build both compiled-resource helpers."
+    }
+
     & $Python -c "import tkinter as tk; root = tk.Tk(); root.withdraw(); root.update_idletasks(); root.destroy()"
     if ($LASTEXITCODE -ne 0) {
         throw "The selected Python runtime does not have a working Tcl/Tk installation."
@@ -84,7 +92,7 @@ try {
         throw "The VPK extractor publish failed."
     }
 
-    & $dotnet9 publish "tools/ModelPatcher/ModelPatcher.csproj" `
+    & $dotnet publish "tools/ModelPatcher/ModelPatcher.csproj" `
         --configuration Release `
         --runtime $Runtime `
         --self-contained true `
@@ -96,7 +104,7 @@ try {
         -p:TrimMode=link `
         -p:DebugType=None
     if ($LASTEXITCODE -ne 0) {
-        throw "The model skin patcher publish failed. Install the .NET 9 SDK."
+        throw "The model skin patcher publish failed. Install the .NET 10 SDK."
     }
 
     $extractorBinary = Join-Path $extractorOutput $extractorFilename
