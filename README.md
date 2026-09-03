@@ -311,19 +311,21 @@ Both are bundled under the MIT License; see
 ## Validation status
 
 The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25071102`
-on 2026-09-02. A non-deploying audit packed, reopened, and CRC-validated 16,481 entries with no
+on 2026-09-02. A non-deploying audit packed, reopened, and CRC-validated 16,484 entries with no
 missing final source resources:
 
 | Resource type | Mappings |
 | --- | ---: |
-| Models | 10,893 |
+| Models | 10,895 |
 | Materials | 112 |
-| Particles | 5,234 |
+| Particles | 5,235 |
 | Particle snapshots | 241 |
 
-The model total includes nine reviewed compositions: Mirana's Dark Moon Back target, seven current
-Invoker Persona head targets, and Oracle's Automaton back hook. The Oracle composition assembles
-the normal animated back, armor, and head in two verified skeleton-union stages. Invoker's
+The model total includes ten reviewed compositions: Mirana's Dark Moon Back target, seven current
+Invoker Persona head targets, and the Oracle and Axe Automaton back hooks. Oracle's composition
+assembles the normal animated back, armor, and head in two verified skeleton-union stages. Axe's
+composition preserves the normal additional underwear model's animation and morph payload while
+adding the shoulder guard, hair, and belt in three verified skeleton-union stages. Invoker's
 compositions preserve the adult face morph data while combining the adult hair and face on one
 Persona hook. One additional hidden Invoker loadout model is included to raise the three orb
 attachments to adult height.
@@ -344,7 +346,10 @@ profile restores the normal body and Waveform while hiding the Persona-only back
 refit, and was subsequently confirmed in the live client. Oracle's Automaton profile restores the
 normal body and weapon, assembles the normal animated back, armor, and head on the remaining Persona
 hook, and restores all seven declared ability-particle replacements; that revision was also
-subsequently confirmed in the live client.
+subsequently confirmed in the live client. Axe's Automaton profile restores the normal body and
+weapon, composes its normal underwear, shoulder guard, hair, and belt on the remaining hook, and
+restores the declared Battle Hunger and Culling Blade effects; that revision was subsequently
+confirmed in the live client on 2026-09-03.
 
 ## Development
 

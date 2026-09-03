@@ -282,6 +282,25 @@ class PlanningContext:
         by_key = dict(default_item.top_models)
         return by_key.get(key) or by_key.get("model_player")
 
+    def default_composition_model_for(
+        self,
+        hero: str,
+        fallback_slot: str,
+        additional_wearable_index: Optional[int] = None,
+    ) -> Optional[str]:
+        """Resolve a normal slot's main or indexed additional wearable model."""
+
+        if additional_wearable_index is None:
+            return self.default_model_for(self.defaults.get((hero, fallback_slot)))
+        if additional_wearable_index < 0:
+            return None
+        additional = self.default_additional.get((hero, fallback_slot), [])
+        return (
+            additional[additional_wearable_index]
+            if additional_wearable_index < len(additional)
+            else None
+        )
+
     def reviewed_persona_model_for(
         self,
         hero: Optional[str],
@@ -510,6 +529,12 @@ class PlanningContext:
                         "secondary_fallback_slot": (
                             composition_profile.secondary_fallback_slot
                         ),
+                        "primary_additional_wearable_index": (
+                            composition_profile.primary_additional_wearable_index
+                        ),
+                        "secondary_additional_wearable_index": (
+                            composition_profile.secondary_additional_wearable_index
+                        ),
                         "additional_fallbacks": (
                             composition_profile.additional_fallbacks
                         ),
@@ -676,20 +701,26 @@ class PlanningContext:
         ):
             return [], "reviewed Persona slot composition has an unsupported mode"
 
-        primary_source = self.default_model_for(
-            self.defaults.get(
-                (profile.hero, composition_profile.primary_fallback_slot)
-            )
+        primary_source = self.default_composition_model_for(
+            profile.hero,
+            composition_profile.primary_fallback_slot,
+            composition_profile.primary_additional_wearable_index,
         )
-        secondary_source = self.default_model_for(
-            self.defaults.get(
-                (profile.hero, composition_profile.secondary_fallback_slot)
-            )
+        secondary_source = self.default_composition_model_for(
+            profile.hero,
+            composition_profile.secondary_fallback_slot,
+            composition_profile.secondary_additional_wearable_index,
         )
         if primary_source is None:
-            return [], "reviewed primary fallback slot has no current default model"
+            return (
+                [],
+                "reviewed primary fallback has no current default composition model",
+            )
         if secondary_source is None:
-            return [], "reviewed secondary fallback slot has no current default model"
+            return (
+                [],
+                "reviewed secondary fallback has no current default composition model",
+            )
         if not looks_like_model(primary_source):
             return [], "reviewed primary fallback is not a safe model path"
         if not looks_like_model(secondary_source):

@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.5.0";
+    private const string Version = "0.6.0";
 
     public static int Main(string[] args)
     {

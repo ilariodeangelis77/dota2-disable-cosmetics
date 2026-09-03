@@ -25,6 +25,8 @@ class PersonaSlotCompositionProfile:
     primary_fallback_slot: str
     secondary_fallback_slot: str
     mode: str
+    primary_additional_wearable_index: Optional[int] = None
+    secondary_additional_wearable_index: Optional[int] = None
     additional_fallbacks: tuple[tuple[str, str], ...] = ()
 
 
@@ -115,6 +117,32 @@ PERSONA_PROFILES = {
             # model-less and should be reviewed if Valve gives it a model.
             slot_fallbacks=(),
             hidden_slots=("neck_persona_1",),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_axe",
+            # The Automaton exposes two wearable hooks for Axe's normal weapon,
+            # shoulder guard, hair, belt, and default additional underwear.
+            # Keep the weapon direct. Preserve the underwear's animation and
+            # morph payload as the primary of the remaining multi-stage union,
+            # then add the armor, hair, and belt meshes to the back hook.
+            slot_fallbacks=(
+                ("weapon_persona_1", "weapon"),
+                ("back_persona_1", "belt"),
+            ),
+            base_particle_slots=("weapon_persona_1",),
+            slot_compositions=(
+                PersonaSlotCompositionProfile(
+                    slot="back_persona_1",
+                    primary_fallback_slot="belt",
+                    primary_additional_wearable_index=0,
+                    secondary_fallback_slot="armor",
+                    mode="skeleton-union",
+                    additional_fallbacks=(
+                        ("head", "skeleton-union"),
+                        ("belt", "skeleton-union"),
+                    ),
+                ),
+            ),
         ),
         PersonaProfile(
             hero="npc_dota_hero_oracle",

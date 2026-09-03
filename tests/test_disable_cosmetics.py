@@ -933,6 +933,218 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_model_compositions_planned"], 2)
         self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
 
+    def test_axe_automaton_assembles_normal_wearables_and_additional_model(self):
+        hero = "npc_dota_hero_axe"
+        normal_models = {
+            "weapon": "models/heroes/axe/axe_weapon.vmdl",
+            "armor": "models/heroes/axe/axe_armor.vmdl",
+            "head": "models/heroes/axe/axe_ponytail.vmdl",
+            "belt": "models/heroes/axe/axe_belt.vmdl",
+        }
+        normal_underwear = (
+            "models/items/axe/ti9_jungle_axe/axe_ti9__undie.vmdl"
+        )
+        persona_weapon = (
+            "models/items/axe/axe_carnival/axe_carnival_weapon.vmdl"
+        )
+        persona_back = "models/items/axe/axe_carnival/axe_carnival_back.vmdl"
+        persona_body = "models/items/axe/axe_carnival/axe_carnival_base.vmdl"
+        normal_culling = (
+            "particles/units/heroes/hero_axe/axe_culling_blade_kill.vpcf"
+        )
+        automaton_culling = (
+            "particles/econ/items/axe/axe_carnival/"
+            "axe_carnival_culling_blade_kill.vpcf"
+        )
+        normal_hunger = "particles/units/heroes/hero_axe/axe_battle_hunger.vpcf"
+        automaton_hunger = (
+            "particles/econ/items/axe/axe_carnival/"
+            "axe_carnival_battle_hunger.vpcf"
+        )
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=model,
+                visuals=(
+                    [{"type": "additional_wearable", "asset": normal_underwear}]
+                    if slot == "belt"
+                    else None
+                ),
+            )
+            for index, (slot, model) in enumerate(normal_models.items(), start=1)
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                item(
+                    896,
+                    hero=hero,
+                    slot="weapon_persona_1",
+                    baseitem="1",
+                    model=persona_weapon,
+                    visuals=[
+                        {
+                            "type": "particle",
+                            "asset": normal_culling,
+                            "modifier": automaton_culling,
+                        }
+                    ],
+                ),
+                item(
+                    898,
+                    hero=hero,
+                    slot="back_persona_1",
+                    baseitem="1",
+                    model=persona_back,
+                ),
+                item(
+                    31367,
+                    hero=hero,
+                    slot="persona_selector",
+                    visuals=[
+                        {
+                            "type": "entity_model",
+                            "asset": hero,
+                            "modifier": persona_body,
+                        },
+                        {
+                            "type": "particle",
+                            "asset": normal_hunger,
+                            "modifier": automaton_hunger,
+                        },
+                    ],
+                ),
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/axe/axe.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+
+        self.assertEqual(
+            by_target[persona_body].source,
+            "models/heroes/axe/axe.vmdl",
+        )
+        self.assertEqual(by_target[persona_weapon].source, normal_models["weapon"])
+        self.assertEqual(by_target[persona_back].source, normal_models["belt"])
+        self.assertEqual(by_target[automaton_culling].source, normal_culling)
+        self.assertEqual(by_target[automaton_hunger].source, normal_hunger)
+        self.assertEqual(plan.unresolved, [])
+        self.assertEqual(len(plan.model_compositions), 1)
+        composition = plan.model_compositions[0]
+        self.assertEqual(composition.target, persona_back)
+        self.assertEqual(composition.primary_source, normal_underwear)
+        self.assertEqual(composition.secondary_source, normal_models["armor"])
+        self.assertEqual(composition.mode, "skeleton-union")
+        self.assertEqual(
+            composition.additional_parts,
+            (
+                generator.ModelCompositionPart(
+                    source=normal_models["head"],
+                    mode="skeleton-union",
+                ),
+                generator.ModelCompositionPart(
+                    source=normal_models["belt"],
+                    mode="skeleton-union",
+                ),
+            ),
+        )
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 2)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_planned"], 1)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
+
+    def test_axe_automaton_reports_missing_default_additional_wearable(self):
+        hero = "npc_dota_hero_axe"
+        records = {
+            record.item_id: record
+            for record in (
+                item(
+                    1,
+                    hero=hero,
+                    slot="weapon",
+                    baseitem="1",
+                    model="models/heroes/axe/axe_weapon.vmdl",
+                ),
+                item(
+                    2,
+                    hero=hero,
+                    slot="armor",
+                    baseitem="1",
+                    model="models/heroes/axe/axe_armor.vmdl",
+                ),
+                item(
+                    3,
+                    hero=hero,
+                    slot="head",
+                    baseitem="1",
+                    model="models/heroes/axe/axe_ponytail.vmdl",
+                ),
+                item(
+                    4,
+                    hero=hero,
+                    slot="belt",
+                    baseitem="1",
+                    model="models/heroes/axe/axe_belt.vmdl",
+                ),
+                item(
+                    896,
+                    hero=hero,
+                    slot="weapon_persona_1",
+                    baseitem="1",
+                    model="models/items/axe/axe_carnival/weapon.vmdl",
+                    visuals=[
+                        {
+                            "type": "particle",
+                            "asset": "particles/units/heroes/hero_axe/kill.vpcf",
+                            "modifier": "particles/econ/items/axe/carnival/kill.vpcf",
+                        }
+                    ],
+                ),
+                item(
+                    898,
+                    hero=hero,
+                    slot="back_persona_1",
+                    baseitem="1",
+                    model="models/items/axe/axe_carnival/back.vmdl",
+                ),
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/axe/axe.vmdl"},
+            [],
+        )
+
+        composition_diagnostics = [
+            entry
+            for entry in plan.unresolved
+            if entry["type"] == "persona_slot_model_composition"
+        ]
+        self.assertEqual(len(composition_diagnostics), 1)
+        self.assertEqual(
+            composition_diagnostics[0]["primary_additional_wearable_index"],
+            0,
+        )
+        self.assertIn(
+            "no current default composition model",
+            composition_diagnostics[0]["reason"],
+        )
+        self.assertEqual(plan.stats["persona_profiles_validated"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 1)
+
     def test_invoker_persona_restores_adult_wearables_and_forge_spirit(self):
         hero = "npc_dota_hero_invoker"
         normal_defaults = tuple(
@@ -3267,7 +3479,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.5\.0.*0\.1\.0",
+                r"Expected 0\.6\.0.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))

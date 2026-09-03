@@ -56,7 +56,6 @@ internal static class ModelComposer
         "m_refAnimGroups",
         "m_refSequenceGroups",
         "m_meshGroups",
-        "m_materialGroups",
         "m_boneFlexDrivers",
         "m_BodyGroupsHiddenInTools",
         "m_refAnimIncludeModels",
@@ -72,12 +71,15 @@ internal static class ModelComposer
         using var primary = ModelInput.Open(
             primaryPath,
             "primary",
+            allowExternalRemapping: mode != ModelCompositionMode.SharedRoot,
             allowPrimaryPayload: true);
         using var secondary = ModelInput.Open(
             secondaryPath,
             "secondary",
             allowExternalRemapping: mode != ModelCompositionMode.SharedRoot,
-            requireSingleRoot: mode != ModelCompositionMode.SkeletonOverlay);
+            allowDiscardedMaterialGroups: true,
+            allowDiscardedPhysics: true,
+            requireSingleRoot: mode == ModelCompositionMode.SharedRoot);
         ValidatePair(primary, secondary, mode);
 
         var primaryMeshCount = primary.Meshes.Length;
@@ -178,11 +180,7 @@ internal static class ModelComposer
         {
             throw new InvalidDataException("The models have incompatible model-info metadata.");
         }
-        if (!FloatValues(GetArray(primary.Model.Data, "m_lodGroupSwitchDistances"))
-            .SequenceEqual(FloatValues(GetArray(secondary.Model.Data, "m_lodGroupSwitchDistances"))))
-        {
-            throw new InvalidDataException("The models use different LOD switch distances.");
-        }
+        MergeCompatibleLodDistances(primary, secondary);
         if (primary.Model.Data.GetUnsignedIntegerProperty("m_nDefaultMeshGroupMask")
             != secondary.Model.Data.GetUnsignedIntegerProperty("m_nDefaultMeshGroupMask"))
         {
@@ -218,6 +216,38 @@ internal static class ModelComposer
             throw new InvalidDataException(
                 $"The models contain the same embedded mesh name: {duplicateMeshName}.");
         }
+    }
+
+    private static void MergeCompatibleLodDistances(
+        ModelInput primary,
+        ModelInput secondary)
+    {
+        var primaryArray = GetArray(primary.Model.Data, "m_lodGroupSwitchDistances");
+        var secondaryArray = GetArray(secondary.Model.Data, "m_lodGroupSwitchDistances");
+        var primaryDistances = FloatValues(primaryArray);
+        var secondaryDistances = FloatValues(secondaryArray);
+        if (primaryDistances.SequenceEqual(secondaryDistances))
+        {
+            return;
+        }
+
+        // A mesh with the all-LOD mask does not depend on a switch-distance
+        // table. This lets a payload-bearing all-LOD wearable remain primary
+        // while a normal secondary contributes its explicit LOD table, and
+        // lets further all-LOD pieces join that combined model safely.
+        if (primaryDistances.Length == 0
+            && primary.Meshes.All(mesh => mesh.LoDMask == 0xff))
+        {
+            AppendArray(primaryArray, secondaryArray);
+            return;
+        }
+        if (secondaryDistances.Length == 0
+            && secondary.Meshes.All(mesh => mesh.LoDMask == 0xff))
+        {
+            return;
+        }
+
+        throw new InvalidDataException("The models use incompatible LOD switch distances.");
     }
 
     private static void ValidateSkeletonOverlay(ModelInput primary, ModelInput secondary)
@@ -297,15 +327,17 @@ internal static class ModelComposer
             .Where(secondaryIndexes.ContainsKey)
             .ToArray();
         if (sharedNames.Length == 0
-            || !primaryIndexes.ContainsKey(secondary.RootBoneName))
+            || secondary.RootBoneIndexes.Any(
+                index => secondary.RequiredBoneNames.Contains(secondary.BoneNames[index])
+                    && !primaryIndexes.ContainsKey(secondary.BoneNames[index])))
         {
             throw new InvalidDataException(
-                "A skeleton union must attach at a shared secondary root bone.");
+                "A skeleton union must attach at shared secondary root bones.");
         }
 
         var primaryTransforms = BuildWorldBoneTransforms(primary);
         var secondaryTransforms = BuildWorldBoneTransforms(secondary);
-        foreach (var name in sharedNames)
+        foreach (var name in sharedNames.Where(secondary.RequiredBoneNames.Contains))
         {
             var primaryIndex = primaryIndexes[name];
             var secondaryIndex = secondaryIndexes[name];
@@ -853,13 +885,17 @@ internal static class ModelComposer
         public required string[] BoneNames { get; init; }
         public required int RootBoneIndex { get; init; }
         public required string RootBoneName { get; init; }
+        public required int[] RootBoneIndexes { get; init; }
+        public required HashSet<string> RequiredBoneNames { get; init; }
 
         public static ModelInput Open(
             string path,
             string label,
             bool allowExternalRemapping = false,
             bool requireSingleRoot = true,
-            bool allowPrimaryPayload = false)
+            bool allowPrimaryPayload = false,
+            bool allowDiscardedMaterialGroups = false,
+            bool allowDiscardedPhysics = false)
         {
             var bytes = File.ReadAllBytes(path);
             var resource = new Resource();
@@ -878,7 +914,8 @@ internal static class ModelComposer
                     model,
                     control,
                     label,
-                    allowExternalRemapping);
+                    allowExternalRemapping,
+                    allowDiscardedMaterialGroups);
                 var meshBlocks = allowPrimaryPayload
                     ? CollectPrimaryPayloadBlocks(
                         resource,
@@ -897,7 +934,8 @@ internal static class ModelComposer
                         references,
                         editInfo,
                         model,
-                        label);
+                        label,
+                        allowDiscardedPhysics);
                 }
                 var meshes = model.GetEmbeddedMeshesAndLoD()
                     .Select(mesh =>
@@ -949,6 +987,11 @@ internal static class ModelComposer
                     BoneNames = boneNames,
                     RootBoneIndex = roots[0],
                     RootBoneName = boneNames[roots[0]],
+                    RootBoneIndexes = roots,
+                    RequiredBoneNames = ReadRequiredBoneNames(
+                        model,
+                        boneNames,
+                        parents),
                 };
             }
             catch
@@ -961,11 +1004,124 @@ internal static class ModelComposer
         public void Dispose() => Resource.Dispose();
     }
 
+    private static HashSet<string> ReadRequiredBoneNames(
+        Model model,
+        IReadOnlyList<string> boneNames,
+        IReadOnlyList<int> parents)
+    {
+        var usedIndexes = new HashSet<int>();
+        foreach (var embedded in model.GetEmbeddedMeshesAndLoD())
+        {
+            var skeleton = embedded.Mesh.Data.GetSubCollection("m_skeleton");
+            var boneWeightCount = skeleton?.GetInt32Property("m_nBoneWeightCount") ?? 0;
+            if (boneWeightCount <= 0)
+            {
+                continue;
+            }
+            var remapping = model.GetRemapTable(embedded.MeshIndex) ?? [];
+            foreach (var vertexBuffer in embedded.Mesh.VBIB.VertexBuffers)
+            {
+                if (vertexBuffer.ElementCount == 0)
+                {
+                    continue;
+                }
+                var indexAttributes = vertexBuffer.InputLayoutFields
+                    .Where(attribute => attribute.SemanticName == "BLENDINDICES")
+                    .ToArray();
+                if (indexAttributes.Length == 0)
+                {
+                    continue;
+                }
+                if (indexAttributes.Length != 1)
+                {
+                    throw new InvalidDataException(
+                        "A composed mesh has multiple blend-index streams.");
+                }
+                var weightAttributes = vertexBuffer.InputLayoutFields
+                    .Where(attribute => attribute.SemanticName is "BLENDWEIGHT" or "BLENDWEIGHTS")
+                    .ToArray();
+                if (weightAttributes.Length > 1)
+                {
+                    throw new InvalidDataException(
+                        "A composed mesh has multiple blend-weight streams.");
+                }
+
+                var indexes = VBIB.GetBlendIndicesArray(
+                    vertexBuffer,
+                    indexAttributes[0]);
+                var packedInfluences = checked(
+                    indexes.Length / (int)vertexBuffer.ElementCount);
+                var activeInfluences = Math.Min(boneWeightCount, packedInfluences);
+                var weights = weightAttributes.Length == 0
+                    ? null
+                    : VBIB.GetBlendWeightsArray(vertexBuffer, weightAttributes[0]);
+                for (var vertex = 0; vertex < vertexBuffer.ElementCount; vertex++)
+                {
+                    for (var influence = 0; influence < activeInfluences; influence++)
+                    {
+                        if (weights is not null
+                            && ReadBlendWeight(
+                                weights,
+                                checked((int)vertex),
+                                influence,
+                                packedInfluences) <= 0.000001f)
+                        {
+                            continue;
+                        }
+                        var remappingIndex = indexes[
+                            checked((int)vertex) * packedInfluences + influence];
+                        if (remappingIndex >= remapping.Length)
+                        {
+                            throw new InvalidDataException(
+                                "A composed mesh references an invalid bone-remapping entry.");
+                        }
+                        var boneIndex = remapping[remappingIndex];
+                        if (boneIndex >= 0 && boneIndex < boneNames.Count)
+                        {
+                            usedIndexes.Add(boneIndex);
+                        }
+                    }
+                }
+            }
+        }
+
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var usedIndex in usedIndexes)
+        {
+            for (var index = usedIndex; index >= 0; index = parents[index])
+            {
+                if (!required.Add(boneNames[index]))
+                {
+                    break;
+                }
+            }
+        }
+        return required;
+    }
+
+    private static float ReadBlendWeight(
+        IReadOnlyList<Vector4> weights,
+        int vertex,
+        int influence,
+        int packedInfluences)
+    {
+        var vector = weights[
+            vertex * (packedInfluences / 4) + influence / 4];
+        return influence % 4 switch
+        {
+            0 => vector.X,
+            1 => vector.Y,
+            2 => vector.Z,
+            _ => vector.W,
+        };
+    }
+
     private static KVObject ValidateModel(
         Model model,
         BinaryKV3 control,
         string label,
-        bool allowExternalRemapping)
+        bool allowExternalRemapping,
+        bool allowDiscardedMaterialGroups)
     {
         if (model.GetReferenceMeshNamesAndLoD().Any())
         {
@@ -978,6 +1134,23 @@ internal static class ModelComposer
             {
                 throw new InvalidDataException(
                     $"The {label} model has unsupported non-empty metadata: {key}.");
+            }
+        }
+        var materialGroups = GetArray(model.Data, "m_materialGroups");
+        if (materialGroups.Count != 0 && !allowDiscardedMaterialGroups)
+        {
+            throw new InvalidDataException(
+                $"The {label} model has unsupported non-empty metadata: m_materialGroups.");
+        }
+        foreach (var value in materialGroups.Properties.Values)
+        {
+            var group = RequireObject(value, $"{label} material group");
+            if (string.IsNullOrWhiteSpace(group.GetProperty<string>("m_name"))
+                || StringValues(GetArray(group, "m_materials"))
+                    .Any(material => string.IsNullOrWhiteSpace(material)))
+            {
+                throw new InvalidDataException(
+                    $"The {label} model has a malformed material group.");
             }
         }
         if (!model.Data.Properties.TryGetValue("m_pModelConfigList", out var config)
@@ -1012,6 +1185,7 @@ internal static class ModelComposer
         {
             throw new InvalidDataException($"The {label} model has no bones.");
         }
+        EnsureBoneScales(skeleton, boneCount);
         foreach (var key in BoneArrayKeys)
         {
             if (GetArray(skeleton, key).Count != boneCount)
@@ -1083,6 +1257,24 @@ internal static class ModelComposer
         return definitions;
     }
 
+    private static void EnsureBoneScales(KVObject skeleton, int boneCount)
+    {
+        if (skeleton.Properties.ContainsKey("m_boneScaleParent"))
+        {
+            return;
+        }
+
+        // Source 2 omits this optional field when every local bone scale is
+        // the schema default of 1. Materialize it before skeleton validation
+        // and merging so later composition stages have a complete array.
+        var scales = new KVObject(null, isArray: true);
+        for (var index = 0; index < boneCount; index++)
+        {
+            scales.AddProperty(null, new KVValue(1.0f));
+        }
+        skeleton.AddProperty("m_boneScaleParent", new KVValue(scales));
+    }
+
     private static List<Block> CollectPrimaryPayloadBlocks(
         Resource resource,
         BinaryKV3 control,
@@ -1148,11 +1340,21 @@ internal static class ModelComposer
         ResourceExtRefList references,
         Block editInfo,
         Model model,
-        string label)
+        string label,
+        bool allowDiscardedPhysics)
     {
         var allowed = meshBlocks
             .Concat([control, references, editInfo, model])
             .ToHashSet();
+        if (allowDiscardedPhysics)
+        {
+            // Wearable collision is not part of the rendered mesh, and models
+            // reaching this point have already been required to expose no
+            // m_refPhysicsData or m_refPhysicsHitboxData entries. The primary
+            // payload remains authoritative for the composed target.
+            allowed.UnionWith(
+                resource.Blocks.Where(block => block.Type == BlockType.PHYS));
+        }
         if (allowed.Count != resource.Blocks.Count
             || resource.Blocks.Any(block => !allowed.Contains(block)))
         {
