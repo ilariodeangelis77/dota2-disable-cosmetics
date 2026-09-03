@@ -47,6 +47,7 @@ class PersonaProfile:
 
     hero: str
     slot_fallbacks: tuple[tuple[str, str], ...]
+    selector_item_id: Optional[str] = None
     hidden_slots: tuple[str, ...] = ()
     base_visual_slots: tuple[str, ...] = ()
     base_particle_slots: tuple[str, ...] = ()
@@ -117,6 +118,32 @@ PERSONA_PROFILES = {
             # model-less and should be reviewed if Valve gives it a model.
             slot_fallbacks=(),
             hidden_slots=("neck_persona_1",),
+        ),
+        PersonaProfile(
+            hero="npc_dota_hero_bristleback",
+            # The Automaton has two wearable hooks. Keep the flail direct,
+            # then assemble the normal back, head, bracers, and necklace on
+            # the remaining hook. Its selector is non-base, so validate its
+            # body and particle rules against the exact current item ID.
+            slot_fallbacks=(
+                ("weapon_persona_1", "weapon"),
+                ("back_persona_1", "back"),
+            ),
+            selector_item_id="36214",
+            base_visual_slots=("persona_selector",),
+            base_particle_slots=("persona_selector",),
+            slot_compositions=(
+                PersonaSlotCompositionProfile(
+                    slot="back_persona_1",
+                    primary_fallback_slot="back",
+                    secondary_fallback_slot="head",
+                    mode="skeleton-union",
+                    additional_fallbacks=(
+                        ("arms", "skeleton-union"),
+                        ("neck", "skeleton-union"),
+                    ),
+                ),
+            ),
         ),
         PersonaProfile(
             hero="npc_dota_hero_axe",

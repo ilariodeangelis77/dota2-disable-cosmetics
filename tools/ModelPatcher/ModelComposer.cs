@@ -320,10 +320,16 @@ internal static class ModelComposer
     {
         var primaryIndexes = primary.BoneNames
             .Select((name, index) => (name, index))
-            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.Ordinal);
+            .ToDictionary(
+                pair => pair.name,
+                pair => pair.index,
+                StringComparer.OrdinalIgnoreCase);
         var secondaryIndexes = secondary.BoneNames
             .Select((name, index) => (name, index))
-            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.Ordinal);
+            .ToDictionary(
+                pair => pair.name,
+                pair => pair.index,
+                StringComparer.OrdinalIgnoreCase);
         var sharedNames = primary.BoneNames
             .Where(secondaryIndexes.ContainsKey)
             .ToArray();
@@ -465,7 +471,10 @@ internal static class ModelComposer
         var secondaryNames = GetArray(secondarySkeleton, "m_boneName");
         var nameToIndex = StringValues(primaryNames)
             .Select((name, index) => (name, index))
-            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.Ordinal);
+            .ToDictionary(
+                pair => pair.name,
+                pair => pair.index,
+                StringComparer.OrdinalIgnoreCase);
         var secondaryToCombined = new int[secondaryNames.Count];
 
         for (var secondaryIndex = 0; secondaryIndex < secondaryNames.Count; secondaryIndex++)
@@ -1094,7 +1103,7 @@ internal static class ModelComposer
             }
         }
 
-        var required = new HashSet<string>(StringComparer.Ordinal);
+        var required = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var usedIndex in usedIndexes)
         {
             for (var index = usedIndex; index >= 0; index = parents[index])
@@ -1204,7 +1213,7 @@ internal static class ModelComposer
             }
         }
         var boneNames = StringValues(GetArray(skeleton, "m_boneName"));
-        if (boneNames.Distinct(StringComparer.Ordinal).Count() != boneNames.Length)
+        if (boneNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != boneNames.Length)
         {
             throw new InvalidDataException($"The {label} model has duplicate bone names.");
         }

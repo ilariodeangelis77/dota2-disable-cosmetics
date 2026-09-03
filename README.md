@@ -321,8 +321,9 @@ missing final source resources:
 | Particles | 5,235 |
 | Particle snapshots | 241 |
 
-The model total includes eleven reviewed compositions: Mirana's Dark Moon Back target, seven current
-Invoker Persona head targets, and the Oracle and Axe Automaton back hooks. Oracle's composition
+The model total includes twelve reviewed compositions: Mirana's Dark Moon Back target, seven current
+Invoker Persona head targets, and the Oracle, Axe, Legion Commander, and Bristleback Automaton back
+hooks. Oracle's composition
 assembles the normal animated back, armor, and head in two verified skeleton-union stages. Axe's
 composition preserves the normal additional underwear model's animation and morph payload while
 adding the shoulder guard, hair, and belt in three verified skeleton-union stages. Invoker's
@@ -353,7 +354,10 @@ restores the declared Battle Hunger and Culling Blade effects; that revision was
 confirmed in the live client on 2026-09-03. Legion Commander's Automaton restores the normal body,
 sword, and banners directly, assembles the normal shoulders, helm, and arms on its remaining gear
 hook, and restores the normal Duel and Overwhelming Odds effects; that revision was subsequently
-confirmed in the live client on 2026-09-03.
+confirmed in the live client on 2026-09-03. Bristleback's Automaton restores the normal body and
+flail directly, composes the normal back, head, bracers, and necklace on the remaining hook, and
+restores its declared ability effects; that revision was subsequently confirmed in the live client
+on 2026-09-03.
 
 ## Development
 

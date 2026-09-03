@@ -385,6 +385,46 @@ class PlanningContext:
                 for visual in item.visuals
             )
         }
+
+        def selector_has_rule(
+            profile: PersonaProfile,
+            persona_slot: str,
+            rule_types: set[str],
+        ) -> bool:
+            """Validate a reviewed non-base Persona selector by its item ID."""
+
+            if profile.selector_item_id is None:
+                return False
+            item = self.items.get(profile.selector_item_id)
+            return bool(
+                item
+                and item.hero == profile.hero
+                and item_attr(item, self.prefabs, "item_slot") == persona_slot
+                and any(
+                    visual.get("type") in rule_types
+                    and looks_like_model(visual.get("modifier", ""))
+                    for visual in item.visuals
+                )
+            )
+
+        def selector_has_particle_rule(
+            profile: PersonaProfile,
+            persona_slot: str,
+        ) -> bool:
+            if profile.selector_item_id is None:
+                return False
+            item = self.items.get(profile.selector_item_id)
+            return bool(
+                item
+                and item.hero == profile.hero
+                and item_attr(item, self.prefabs, "item_slot") == persona_slot
+                and any(
+                    visual.get("type") in PARTICLE_REPLACEMENT_TYPES
+                    and looks_like_particle(visual.get("asset", ""))
+                    and looks_like_particle(visual.get("modifier", ""))
+                    for visual in item.visuals
+                )
+            )
         for profile in PERSONA_PROFILES.values():
             if profile.hero not in self.hero_models:
                 continue
@@ -435,7 +475,19 @@ class PlanningContext:
                     }
                 )
             for persona_slot in profile.base_visual_slots:
-                if (profile.hero, persona_slot) in modeled_base_visual_slots:
+                if (
+                    (profile.hero, persona_slot) in modeled_base_visual_slots
+                    or selector_has_rule(
+                        profile,
+                        persona_slot,
+                        {
+                            "entity_model",
+                            "base_model",
+                            "entity_clientside_model",
+                            "hero_model_change",
+                        },
+                    )
+                ):
                     self.increment("persona_profile_slots_resolved")
                     continue
 
@@ -455,7 +507,10 @@ class PlanningContext:
                     }
                 )
             for persona_slot in profile.base_particle_slots:
-                if (profile.hero, persona_slot) in modeled_base_particle_slots:
+                if (
+                    (profile.hero, persona_slot) in modeled_base_particle_slots
+                    or selector_has_particle_rule(profile, persona_slot)
+                ):
                     self.increment("persona_profile_slots_resolved")
                     continue
 
