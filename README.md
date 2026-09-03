@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0 beta 2" src="https://img.shields.io/badge/version-0.9.0--beta.2-E85D4A?style=for-the-badge" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-E85D4A?style=for-the-badge" /></a>
   <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=for-the-badge" />
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;color=2EA043" /></a>
 </p>
