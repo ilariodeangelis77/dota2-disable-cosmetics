@@ -28,6 +28,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest"><img alt="Download latest release" src="https://img.shields.io/badge/Download-Latest%20release-2EA043?style=for-the-badge&amp;logo=github&amp;logoColor=white" /></a>
+</p>
+
+<p align="center"><sub>Windows, Linux, and macOS - choose the archive for your platform.</sub></p>
+
+<p align="center">
   <img src="docs/images/dashboard.png" alt="Dota 2 Cosmetic Disabler desktop dashboard" width="100%" />
 </p>
 
