@@ -72,7 +72,8 @@ internal static class ModelComposer
             primaryPath,
             "primary",
             allowExternalRemapping: mode != ModelCompositionMode.SharedRoot,
-            allowPrimaryPayload: true);
+            allowPrimaryPayload: true,
+            allowDiscardedMaterialGroups: true);
         using var secondary = ModelInput.Open(
             secondaryPath,
             "secondary",
@@ -916,6 +917,14 @@ internal static class ModelComposer
                     label,
                     allowExternalRemapping,
                     allowDiscardedMaterialGroups);
+                if (allowDiscardedMaterialGroups)
+                {
+                    // Material groups are optional style alternatives. Keep the
+                    // compiled meshes' own normal material references and clear
+                    // those alternatives so a composed default wearable cannot
+                    // select a cosmetic material group from any source part.
+                    GetArray(model.Data, "m_materialGroups").Properties.Clear();
+                }
                 var meshBlocks = allowPrimaryPayload
                     ? CollectPrimaryPayloadBlocks(
                         resource,

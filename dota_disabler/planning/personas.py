@@ -145,6 +145,26 @@ PERSONA_PROFILES = {
             ),
         ),
         PersonaProfile(
+            hero="npc_dota_hero_legion_commander",
+            # The Automaton provides three hooks for Legion Commander's five
+            # normal visual pieces. Keep sword and banners direct, then build
+            # the helmet, shoulders, and bracers onto the remaining gear hook.
+            slot_fallbacks=(
+                ("weapon_persona_1", "weapon"),
+                ("back_persona_1", "back"),
+                ("misc_persona_1", "shoulder"),
+            ),
+            slot_compositions=(
+                PersonaSlotCompositionProfile(
+                    slot="misc_persona_1",
+                    primary_fallback_slot="shoulder",
+                    secondary_fallback_slot="head",
+                    mode="skeleton-union",
+                    additional_fallbacks=(("arms", "skeleton-union"),),
+                ),
+            ),
+        ),
+        PersonaProfile(
             hero="npc_dota_hero_oracle",
             # The Automaton exposes two wearable hooks for Oracle's four
             # normal pieces. Keep the weapon direct, then assemble the back,

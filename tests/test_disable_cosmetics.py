@@ -1145,6 +1145,132 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["persona_profiles_validated"], 0)
         self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 1)
 
+    def test_legion_commander_automaton_assembles_normal_wearables_and_effects(self):
+        hero = "npc_dota_hero_legion_commander"
+        normal_models = {
+            "weapon": "models/heroes/legion_commander/weapon.vmdl",
+            "back": "models/heroes/legion_commander/back.vmdl",
+            "head": "models/heroes/legion_commander/head.vmdl",
+            "shoulder": "models/heroes/legion_commander/shoulder.vmdl",
+            "arms": "models/heroes/legion_commander/arms.vmdl",
+        }
+        persona_models = {
+            "weapon_persona_1": "models/items/legion/carnival/weapon.vmdl",
+            "back_persona_1": "models/items/legion/carnival/back.vmdl",
+            "misc_persona_1": "models/items/legion/carnival/gears.vmdl",
+        }
+        persona_body = "models/items/legion/carnival/base.vmdl"
+        effects = (
+            (
+                "particles/units/heroes/hero_legion_commander/duel_ring.vpcf",
+                "particles/econ/items/legion/carnival/duel_ring.vpcf",
+            ),
+            (
+                "particles/units/heroes/hero_legion_commander/odds.vpcf",
+                "particles/units/heroes/hero_legion_commander/carnival_odds.vpcf",
+            ),
+            (
+                "particles/units/heroes/hero_legion_commander/odds_arrows.vpcf",
+                "particles/units/heroes/hero_legion_commander/carnival_odds_arrows.vpcf",
+            ),
+        )
+        normal_defaults = tuple(
+            item(
+                index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=model,
+            )
+            for index, (slot, model) in enumerate(normal_models.items(), start=1)
+        )
+        persona_defaults = tuple(
+            item(
+                20 + index,
+                hero=hero,
+                slot=slot,
+                baseitem="1",
+                model=model,
+            )
+            for index, (slot, model) in enumerate(persona_models.items())
+        )
+        records = {
+            record.item_id: record
+            for record in (
+                *normal_defaults,
+                *persona_defaults,
+                item(
+                    36191,
+                    hero=hero,
+                    slot="persona_selector",
+                    visuals=[
+                        {
+                            "type": "entity_model",
+                            "asset": hero,
+                            "modifier": persona_body,
+                        },
+                        *(
+                            {
+                                "type": "particle",
+                                "asset": source,
+                                "modifier": target,
+                            }
+                            for source, target in effects
+                        ),
+                    ],
+                ),
+            )
+        }
+
+        plan = generator.build_plan(
+            {},
+            records,
+            {hero: "models/heroes/legion_commander/legion_commander.vmdl"},
+            [],
+        )
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+
+        self.assertEqual(
+            by_target[persona_body].source,
+            "models/heroes/legion_commander/legion_commander.vmdl",
+        )
+        self.assertEqual(
+            by_target[persona_models["weapon_persona_1"]].source,
+            normal_models["weapon"],
+        )
+        self.assertEqual(
+            by_target[persona_models["back_persona_1"]].source,
+            normal_models["back"],
+        )
+        self.assertEqual(
+            by_target[persona_models["misc_persona_1"]].source,
+            normal_models["shoulder"],
+        )
+        for source, target in effects:
+            self.assertEqual(by_target[target].source, source)
+        self.assertEqual(plan.unresolved, [])
+        self.assertEqual(len(plan.model_compositions), 1)
+        composition = plan.model_compositions[0]
+        self.assertEqual(composition.target, persona_models["misc_persona_1"])
+        self.assertEqual(composition.primary_source, normal_models["shoulder"])
+        self.assertEqual(composition.secondary_source, normal_models["head"])
+        self.assertEqual(composition.mode, "skeleton-union")
+        self.assertEqual(
+            composition.additional_parts,
+            (
+                generator.ModelCompositionPart(
+                    source=normal_models["arms"],
+                    mode="skeleton-union",
+                ),
+            ),
+        )
+        self.assertEqual(plan.stats["persona_slot_defaults_restored"], 3)
+        self.assertEqual(plan.stats["persona_profiles_validated"], 1)
+        self.assertEqual(plan.stats["persona_profile_slots_resolved"], 3)
+        self.assertEqual(plan.stats["persona_profile_slots_unresolved"], 0)
+        self.assertEqual(plan.stats["persona_model_compositions_planned"], 1)
+        self.assertEqual(plan.stats["persona_model_compositions_unresolved"], 0)
+
     def test_invoker_persona_restores_adult_wearables_and_forge_spirit(self):
         hero = "npc_dota_hero_invoker"
         normal_defaults = tuple(
@@ -3479,7 +3605,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.6\.0.*0\.1\.0",
+                r"Expected 0\.7\.0.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))

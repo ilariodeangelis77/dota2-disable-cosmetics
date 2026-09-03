@@ -16,7 +16,7 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
-MODEL_PATCHER_VERSION = "0.6.0"
+MODEL_PATCHER_VERSION = "0.7.0"
 MODEL_COMPOSITION_MODES = frozenset(
     {"shared-root", "skeleton-overlay", "skeleton-union"}
 )
