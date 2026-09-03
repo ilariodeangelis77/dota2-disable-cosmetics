@@ -310,54 +310,21 @@ Both are bundled under the MIT License; see
 
 ## Validation status
 
-The mapping baseline for `0.9.0-beta.2` was regenerated from installed Dota Steam build `25089218`
-on 2026-09-03. A non-deploying audit packed, reopened, and CRC-validated 16,487 entries with no
-missing final source resources:
+Every release is checked at three levels:
 
-| Resource type | Mappings |
-| --- | ---: |
-| Models | 10,898 |
-| Materials | 112 |
-| Particles | 5,235 |
-| Particle snapshots | 241 |
+1. **Automated tests** cover the planner, model transformations, VPK ownership, cleanup, and the
+   packaged application.
+2. **Current-install audits** rebuild the mapping from the locally installed Dota schemas, extract
+   its required sources, and validate the generated VPK without changing the game installation.
+3. **In-game checks** confirm representative heroes, effects, and reviewed Persona bridges in the
+   Armory, Demo Hero, or a custom lobby.
 
-The model total includes twelve reviewed compositions: Mirana's Dark Moon Back target, seven current
-Invoker Persona head targets, and the Oracle, Axe, Legion Commander, and Bristleback Automaton back
-hooks. Oracle's composition
-assembles the normal animated back, armor, and head in two verified skeleton-union stages. Axe's
-composition preserves the normal additional underwear model's animation and morph payload while
-adding the shoulder guard, hair, and belt in three verified skeleton-union stages. Invoker's
-compositions preserve the adult face morph data while combining the adult hair and face on one
-Persona hook. One additional hidden Invoker loadout model is included to raise the three orb
-attachments to adult height. Legion Commander's Automaton composition assembles the normal
-shoulders, helm, and arms onto its remaining gear hook.
+The latest full audit packed, reopened, and CRC-validated **16,487 generated resources** with no
+missing final sources.
 
-An earlier all-category build was deployed against Steam build `24812551` on 2026-08-20, and the
-recognized Dutch mount was confirmed to apply overrides in the Armory and Demo Hero. The later
-`0.9.0-beta.2` mapping, skin-material, and desktop progress changes have structural coverage but
-still require another representative in-game visual pass. On 2026-09-01, a refreshed all-category
-build for Steam build `25002408` restored Crystal Maiden's wolf Persona with its human hair, cape,
-shoulders, staff, and correct-looking stance; that specific Persona was confirmed in the live
-client. Mirana's Dark Moon Back composition and Anti-Mage's normal body, chest, head, and dual
-glaives were also confirmed in the live client on 2026-09-02. These results must not be interpreted
-as proof that every cosmetic or Persona works with the current live game. Invoker's reviewed
-profile now composes the adult hair and morph-enabled face onto every current Persona head target,
-uses the freed shoulder hook for the adult shoulders, and raises the Kid-only loadout orb rig to
-adult height; that revision was subsequently confirmed in the live client. Morphling's Automaton
-profile restores the normal body and Waveform while hiding the Persona-only back and inferred arms
-refit, and was subsequently confirmed in the live client. Oracle's Automaton profile restores the
-normal body and weapon, assembles the normal animated back, armor, and head on the remaining Persona
-hook, and restores all seven declared ability-particle replacements; that revision was also
-subsequently confirmed in the live client. Axe's Automaton profile restores the normal body and
-weapon, composes its normal underwear, shoulder guard, hair, and belt on the remaining hook, and
-restores the declared Battle Hunger and Culling Blade effects; that revision was subsequently
-confirmed in the live client on 2026-09-03. Legion Commander's Automaton restores the normal body,
-sword, and banners directly, assembles the normal shoulders, helm, and arms on its remaining gear
-hook, and restores the normal Duel and Overwhelming Odds effects; that revision was subsequently
-confirmed in the live client on 2026-09-03. Bristleback's Automaton restores the normal body and
-flail directly, composes the normal back, head, bracers, and necklace on the remaining hook, and
-restores its declared ability effects; that revision was subsequently confirmed in the live client
-on 2026-09-03.
+Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, and the Morphling, Oracle,
+Axe, Legion Commander, and Bristleback Automatons. Dota updates can change resources or rendering
+behavior, so verify a new build before using it in normal play.
 
 ## Development
 
