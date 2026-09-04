@@ -1,1 +1,2 @@
 pyinstaller==6.21.0
+babel==2.18.0

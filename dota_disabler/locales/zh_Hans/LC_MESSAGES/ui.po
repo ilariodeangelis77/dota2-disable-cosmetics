@@ -1,0 +1,612 @@
+# Simplified Chinese translations for Dota 2 Cosmetic Disabler.
+# This file is distributed under the same license as the project.
+msgid ""
+msgstr ""
+"Project-Id-Version: Dota 2 Cosmetic Disabler 0.9.1\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-04 21:53+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: zh_Hans\n"
+"Language-Team: zh_Hans <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: dota_disabler/gui.py:393
+#, python-brace-format
+msgid "System default ({language})"
+msgstr "系统默认（{language}）"
+
+#: dota_disabler/gui.py:500
+msgid "COSMETIC DISABLER"
+msgstr "饰品禁用器"
+
+#: dota_disabler/gui.py:510
+#, python-brace-format
+msgid "Local model & effect overrides  ·  v{version}  ·  no injection"
+msgstr "本地模型和特效替换  ·  v{version}  ·  无注入"
+
+#: dota_disabler/gui.py:526
+msgid "DETECTING"
+msgstr "正在检测"
+
+#: dota_disabler/gui.py:538
+msgid "Refresh"
+msgstr "刷新"
+
+#: dota_disabler/gui.py:556
+msgid "GUI language"
+msgstr "界面语言"
+
+#: dota_disabler/gui.py:590
+msgid "DOTA 2 INSTALLATION & BUILD STATUS"
+msgstr "DOTA 2 安装与构建状态"
+
+#: dota_disabler/gui.py:622
+msgid "Browse"
+msgstr "浏览"
+
+#: dota_disabler/gui.py:630
+msgid "Auto-detect"
+msgstr "自动检测"
+
+#: dota_disabler/gui.py:639
+msgid "Waiting for detection"
+msgstr "等待检测"
+
+#: dota_disabler/gui.py:654
+msgid "Dota compatibility mount"
+msgstr "Dota 兼容语言挂载点"
+
+#: dota_disabler/gui.py:689
+msgid "INSTALLED DOTA BUILD"
+msgstr "已安装的 DOTA 版本"
+
+#: dota_disabler/gui.py:716
+msgid "OVERRIDES BUILT FROM"
+msgstr "替换文件基于版本"
+
+#: dota_disabler/gui.py:743
+msgid "Looking for your Steam library…"
+msgstr "正在查找 Steam 库…"
+
+#: dota_disabler/gui.py:765
+msgid "COSMETICS TO DISABLE"
+msgstr "要禁用的饰品"
+
+#: dota_disabler/gui.py:775
+msgid "Select all"
+msgstr "全选"
+
+#: dota_disabler/gui.py:783
+msgid "Clear"
+msgstr "清除"
+
+#: dota_disabler/gui.py:861
+msgid "Remove owned overrides"
+msgstr "删除本工具创建的替换文件"
+
+#: dota_disabler/gui.py:870 dota_disabler/gui.py:1107 dota_disabler/gui.py:1135
+#: dota_disabler/gui.py:1421 dota_disabler/gui.py:1464
+#: dota_disabler/gui_model.py:298
+msgid "Build Overrides"
+msgstr "构建替换文件"
+
+#: dota_disabler/gui.py:893 dota_disabler/gui.py:1507
+msgid "Current activity"
+msgstr "当前活动"
+
+#: dota_disabler/gui.py:911
+msgid "Report"
+msgstr "报告"
+
+#: dota_disabler/gui.py:919
+msgid "Output"
+msgstr "输出目录"
+
+#: dota_disabler/gui.py:928
+msgid "Copy launch option"
+msgstr "复制启动选项"
+
+#: dota_disabler/gui.py:967
+msgid ""
+"Safety: unofficial overrides; test in Demo Hero first; no anti-cheat "
+"guarantee."
+msgstr "安全提示：这些替换并非官方支持；请先在英雄试玩中测试；不提供反作弊安全保证。"
+
+#: dota_disabler/gui.py:971
+msgid "Ready. Dota will be detected automatically."
+msgstr "已就绪。将自动检测 Dota。"
+
+#: dota_disabler/gui.py:1062 dota_disabler/gui.py:1334
+msgid "UI ERROR"
+msgstr "界面错误"
+
+#: dota_disabler/gui.py:1071
+#, python-brace-format
+msgid "{selected} of {total} category selected"
+msgid_plural "{selected} of {total} categories selected"
+msgstr[0] "已选择 {selected}/{total} 个类别"
+
+#: dota_disabler/gui.py:1077
+#, python-brace-format
+msgid "{selection}  ·  {language} compatibility mount"
+msgstr "{selection}  ·  {language} 兼容挂载"
+
+#: dota_disabler/gui.py:1084
+msgid "Choose at least one cosmetic category before building"
+msgstr "构建前请至少选择一个饰品类别"
+
+#: dota_disabler/gui.py:1093
+#, python-brace-format
+msgid "Selected {selected} of {total} replacement category."
+msgid_plural "Selected {selected} of {total} replacement categories."
+msgstr[0] "已选择 {selected}/{total} 个替换类别。"
+
+#: dota_disabler/gui.py:1113
+msgid "CHECKING MOUNT"
+msgstr "正在检查挂载点"
+
+#: dota_disabler/gui.py:1120
+#, python-brace-format
+msgid ""
+"Checking the {language} compatibility mount; rebuild to apply a new "
+"selection"
+msgstr "正在检查 {language} 兼容挂载点；请重新构建以应用新选择"
+
+#: dota_disabler/gui.py:1126
+#, python-brace-format
+msgid ""
+"Compatibility mount changed to {language}. Dota's interface will remain "
+"English after building."
+msgstr "兼容挂载点已更改为 {language}。构建后 Dota 界面仍将保持英文。"
+
+#: dota_disabler/gui.py:1139
+msgid "CHECK PATH"
+msgstr "请检查路径"
+
+#: dota_disabler/gui.py:1146
+msgid "Folder changed; refresh to validate it"
+msgstr "文件夹已更改；请刷新以进行验证"
+
+#: dota_disabler/gui.py:1151
+msgid "Edited · press Enter or Refresh"
+msgstr "已编辑 · 按 Enter 或“刷新”"
+
+#: dota_disabler/gui.py:1172
+#, python-brace-format
+msgid "Could not save UI settings: {error}"
+msgstr "无法保存界面设置：{error}"
+
+#: dota_disabler/gui.py:1188
+msgid "Detecting Dota 2 installation…"
+msgstr "正在检测 Dota 2 安装目录…"
+
+#: dota_disabler/gui.py:1202
+msgid "Searching Steam libraries…"
+msgstr "正在搜索 Steam 库…"
+
+#: dota_disabler/gui.py:1208
+msgid "Choose the 'dota 2 beta' folder"
+msgstr "选择“dota 2 beta”文件夹"
+
+#: dota_disabler/gui.py:1216
+msgid "Selected manually"
+msgstr "已手动选择"
+
+#: dota_disabler/gui.py:1230
+msgid "Checking installed Dota build and generated overrides…"
+msgstr "正在检查已安装的 Dota 版本和生成的替换文件…"
+
+#: dota_disabler/gui.py:1237
+msgid "Choose a category"
+msgstr "请选择类别"
+
+#: dota_disabler/gui.py:1238
+msgid "Select at least one replacement category before building."
+msgstr "构建前请至少选择一个替换类别。"
+
+#: dota_disabler/gui.py:1267
+msgid "Building model and effect overrides for the installed Dota build…"
+msgstr "正在为已安装的 Dota 版本构建模型和特效替换…"
+
+#: dota_disabler/gui.py:1273
+msgid "Remove generated overrides?"
+msgstr "删除生成的替换文件？"
+
+#: dota_disabler/gui.py:1275
+msgid ""
+"Only files listed in this tool's ownership marker will be removed. "
+"Untracked files are preserved. The Steam launch option is not changed."
+msgstr "只会删除本工具所有权标记中列出的文件。未跟踪的文件会保留。Steam 启动选项不会更改。"
+
+#: dota_disabler/gui.py:1297
+msgid "Removing owned cosmetic overrides…"
+msgstr "正在删除本工具创建的饰品替换文件…"
+
+#: dota_disabler/gui.py:1311
+msgid "Finalizing operation"
+msgstr "正在完成操作"
+
+#: dota_disabler/gui.py:1326
+msgid "Operation complete"
+msgstr "操作完成"
+
+#: dota_disabler/gui.py:1342
+#, python-brace-format
+msgid "Could not update the dashboard: {error}"
+msgstr "无法更新控制面板：{error}"
+
+#: dota_disabler/gui.py:1362
+msgid "Detected automatically"
+msgstr "已自动检测"
+
+#: dota_disabler/gui.py:1365
+#, python-brace-format
+msgid "Found Dota 2 at {path}"
+msgstr "在 {path} 找到 Dota 2"
+
+#: dota_disabler/gui.py:1369
+msgid "Dota was found, but the existing override folder could not be validated"
+msgstr "已找到 Dota，但无法验证现有的替换文件夹"
+
+#: dota_disabler/gui.py:1377
+msgid "Folder verified"
+msgstr "文件夹已验证"
+
+#: dota_disabler/gui.py:1379
+msgid "Patch status refreshed."
+msgstr "补丁状态已刷新。"
+
+#: dota_disabler/gui.py:1386
+#, python-brace-format
+msgid "Build complete: {count} model/effect resource overrides."
+msgstr "构建完成：已创建 {count} 个模型/特效资源替换。"
+
+#: dota_disabler/gui.py:1391
+msgid "Build completed, but status refresh failed"
+msgstr "构建已完成，但状态刷新失败"
+
+#: dota_disabler/gui.py:1400
+#, python-brace-format
+msgid "Cleanup complete: {count} owned files removed."
+msgstr "清理完成：已删除本工具拥有的 {count} 个文件。"
+
+#: dota_disabler/gui.py:1406
+#, python-brace-format
+msgid ""
+"Remove '-language {language}' from Steam launch options if you no longer "
+"need it."
+msgstr "如果不再需要，请从 Steam 启动选项中删除“-language {language}”。"
+
+#: dota_disabler/gui.py:1411
+msgid "Cleanup completed, but status refresh failed"
+msgstr "清理已完成，但状态刷新失败"
+
+#: dota_disabler/gui.py:1424 dota_disabler/gui.py:1467
+msgid "ACTION NEEDED"
+msgstr "需要处理"
+
+#: dota_disabler/gui.py:1432
+#, python-brace-format
+msgid "{operation} failed: {error}"
+msgstr "{operation}失败：{error}"
+
+#: dota_disabler/gui.py:1443
+msgid "Not found · choose Browse"
+msgstr "未找到 · 请选择“浏览”"
+
+#: dota_disabler/gui.py:1448
+msgid "Unowned file protection"
+msgstr "非本工具文件保护"
+
+#: dota_disabler/gui.py:1450
+#, python-brace-format
+msgid ""
+"{error}\n"
+"\n"
+"The tool stopped without adopting or force-cleaning the folder. Review "
+"the path or close this window."
+msgstr ""
+"{error}\n"
+"\n"
+"本工具已停止，未接管或强制清理该文件夹。请检查路径或关闭此窗口。"
+
+#: dota_disabler/gui.py:1454
+#, python-brace-format
+msgid "{operation} failed"
+msgstr "{operation}失败"
+
+#: dota_disabler/gui.py:1475
+#, python-brace-format
+msgid "{context}: {error}"
+msgstr "{context}：{error}"
+
+#: dota_disabler/gui.py:1483
+msgid "Dota folder verified"
+msgstr "Dota 文件夹已验证"
+
+#: dota_disabler/gui.py:1573 dota_disabler/gui.py:1583
+msgid "Not available yet"
+msgstr "暂不可用"
+
+#: dota_disabler/gui.py:1574
+msgid "Choose a Dota 2 folder or build overrides first."
+msgstr "请先选择 Dota 2 文件夹或构建替换文件。"
+
+#: dota_disabler/gui.py:1584
+#, python-brace-format
+msgid ""
+"This path does not exist yet:\n"
+"{path}"
+msgstr ""
+"此路径尚不存在：\n"
+"{path}"
+
+#: dota_disabler/gui.py:1597
+msgid "Could not open path"
+msgstr "无法打开路径"
+
+#: dota_disabler/gui.py:1607
+#, python-brace-format
+msgid "Copied Steam launch option: {option}"
+msgstr "已复制 Steam 启动选项：{option}"
+
+#: dota_disabler/gui.py:1613
+msgid "Operation in progress"
+msgstr "操作正在进行"
+
+#: dota_disabler/gui.py:1615
+msgid ""
+"Keep this window open until the current operation finishes so deployment "
+"cannot be interrupted."
+msgstr "请保持此窗口打开，直到当前操作完成，以免中断部署。"
+
+#: dota_disabler/gui_model.py:35
+msgid "Brazilian Portuguese"
+msgstr "巴西葡萄牙语"
+
+#: dota_disabler/gui_model.py:36
+msgid "Bulgarian"
+msgstr "保加利亚语"
+
+#: dota_disabler/gui_model.py:37
+msgid "Czech"
+msgstr "捷克语"
+
+#: dota_disabler/gui_model.py:38
+msgid "Danish"
+msgstr "丹麦语"
+
+#: dota_disabler/gui_model.py:39
+msgid "Dutch"
+msgstr "荷兰语"
+
+#: dota_disabler/gui_model.py:40
+msgid "Finnish"
+msgstr "芬兰语"
+
+#: dota_disabler/gui_model.py:41
+msgid "French"
+msgstr "法语"
+
+#: dota_disabler/gui_model.py:42
+msgid "German"
+msgstr "德语"
+
+#: dota_disabler/gui_model.py:43
+msgid "Greek"
+msgstr "希腊语"
+
+#: dota_disabler/gui_model.py:44
+msgid "Hungarian"
+msgstr "匈牙利语"
+
+#: dota_disabler/gui_model.py:45
+msgid "Italian"
+msgstr "意大利语"
+
+#: dota_disabler/gui_model.py:46
+msgid "Japanese"
+msgstr "日语"
+
+#: dota_disabler/gui_model.py:47
+msgid "Korean"
+msgstr "韩语"
+
+#: dota_disabler/gui_model.py:48
+msgid "Latin American Spanish"
+msgstr "拉丁美洲西班牙语"
+
+#: dota_disabler/gui_model.py:49
+msgid "Norwegian"
+msgstr "挪威语"
+
+#: dota_disabler/gui_model.py:50
+msgid "Polish"
+msgstr "波兰语"
+
+#: dota_disabler/gui_model.py:51
+msgid "Portuguese"
+msgstr "葡萄牙语"
+
+#: dota_disabler/gui_model.py:52
+msgid "Romanian"
+msgstr "罗马尼亚语"
+
+#: dota_disabler/gui_model.py:53
+msgid "Russian"
+msgstr "俄语"
+
+#: dota_disabler/gui_model.py:54
+msgid "Simplified Chinese"
+msgstr "简体中文"
+
+#: dota_disabler/gui_model.py:55
+msgid "Spanish"
+msgstr "西班牙语"
+
+#: dota_disabler/gui_model.py:56
+msgid "Swedish"
+msgstr "瑞典语"
+
+#: dota_disabler/gui_model.py:57
+msgid "Traditional Chinese"
+msgstr "繁体中文"
+
+#: dota_disabler/gui_model.py:58
+msgid "Thai"
+msgstr "泰语"
+
+#: dota_disabler/gui_model.py:59
+msgid "Turkish"
+msgstr "土耳其语"
+
+#: dota_disabler/gui_model.py:60
+msgid "Ukrainian"
+msgstr "乌克兰语"
+
+#: dota_disabler/gui_model.py:61
+msgid "Vietnamese"
+msgstr "越南语"
+
+#: dota_disabler/gui_model.py:75
+#, python-brace-format
+msgid "{language} — recommended"
+msgstr "{language} — 推荐"
+
+#: dota_disabler/gui_model.py:102
+msgid "Wearables & attachments"
+msgstr "可穿戴物品和附件"
+
+#: dota_disabler/gui_model.py:103
+msgid "Restore equipped items and attachments."
+msgstr "还原已装备的物品和附件。"
+
+#: dota_disabler/gui_model.py:104 dota_disabler/gui_model.py:111
+#: dota_disabler/gui_model.py:125
+msgid "SUPPORTED"
+msgstr "已支持"
+
+#: dota_disabler/gui_model.py:109
+msgid "Hero transformations"
+msgstr "英雄变身"
+
+#: dota_disabler/gui_model.py:110
+msgid "Restore transformations, pets & summons."
+msgstr "还原变身、宠物和召唤物。"
+
+#: dota_disabler/gui_model.py:116
+msgid "Personas"
+msgstr "身心"
+
+#: dota_disabler/gui_model.py:117
+msgid "Restore Persona models; still experimental."
+msgstr "还原身心模型；此功能仍处于实验阶段。"
+
+#: dota_disabler/gui_model.py:118
+msgid "EXPERIMENTAL"
+msgstr "实验性"
+
+#: dota_disabler/gui_model.py:123
+msgid "Particles & effects"
+msgstr "粒子和特效"
+
+#: dota_disabler/gui_model.py:124
+msgid "Restore default particles and effects."
+msgstr "还原默认粒子和特效。"
+
+#: dota_disabler/gui_model.py:130
+msgid "Detect"
+msgstr "检测"
+
+#: dota_disabler/gui_model.py:131
+msgid "Status"
+msgstr "状态检查"
+
+#: dota_disabler/gui_model.py:132
+msgid "Build"
+msgstr "构建"
+
+#: dota_disabler/gui_model.py:133
+msgid "Clean"
+msgstr "清理"
+
+#: dota_disabler/gui_model.py:271
+msgid "CURRENT"
+msgstr "当前有效"
+
+#: dota_disabler/gui_model.py:273
+msgid "Installed Dota build matches the build used for these overrides"
+msgstr "已安装的 Dota 版本与创建这些替换文件时使用的版本一致"
+
+#: dota_disabler/gui_model.py:274 dota_disabler/gui_model.py:304
+msgid "Rebuild Overrides"
+msgstr "重新构建替换文件"
+
+#: dota_disabler/gui_model.py:277
+msgid "UPDATE FOUND"
+msgstr "发现更新"
+
+#: dota_disabler/gui_model.py:279
+msgid "Installed Dota build changed since the last build"
+msgstr "已安装的 Dota 版本在上次构建后发生了变化"
+
+#: dota_disabler/gui_model.py:280
+msgid "Rebuild for Installed Build"
+msgstr "为已安装版本重新构建"
+
+#: dota_disabler/gui_model.py:283
+msgid "REBUILD REQUIRED"
+msgstr "需要重新构建"
+
+#: dota_disabler/gui_model.py:285
+msgid "Legacy loose overrides are no longer loaded by current Dota"
+msgstr "当前 Dota 已不再加载旧版散装替换文件"
+
+#: dota_disabler/gui_model.py:286
+msgid "Build VPK Overrides"
+msgstr "构建 VPK 替换文件"
+
+#: dota_disabler/gui_model.py:289
+msgid "REPAIR REQUIRED"
+msgstr "需要修复"
+
+#: dota_disabler/gui_model.py:291
+msgid "The owned VPK is missing or failed its checksum check"
+msgstr "本工具创建的 VPK 缺失或未通过校验和检查"
+
+#: dota_disabler/gui_model.py:292
+msgid "Repair Overrides"
+msgstr "修复替换文件"
+
+#: dota_disabler/gui_model.py:295
+msgid "NOT BUILT"
+msgstr "尚未构建"
+
+#: dota_disabler/gui_model.py:297
+msgid "No owned disabler build marker was found"
+msgstr "未找到本工具的构建所有权标记"
+
+#: dota_disabler/gui_model.py:301
+msgid "CHECK NEEDED"
+msgstr "需要检查"
+
+#: dota_disabler/gui_model.py:303
+msgid "The previous run has no comparable Dota-build record"
+msgstr "上次运行没有可供比较的 Dota 版本记录"
+
+#: dota_disabler/gui_model.py:317
+msgid "CHANGES PENDING"
+msgstr "有待应用的更改"
+
+#: dota_disabler/gui_model.py:319
+msgid "Category selection changed; rebuild to apply it"
+msgstr "类别选择已更改；请重新构建以应用更改"
+
+#: dota_disabler/gui_model.py:320
+msgid "Apply Selection"
+msgstr "应用选择"

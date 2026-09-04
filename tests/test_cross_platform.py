@@ -127,6 +127,30 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn('if ($onWindows) { ".zip" } else { ".tar.gz" }', script)
         self.assertIn("chmod +x", script)
         self.assertIn("tar -czf", script)
+        self.assertIn("babel.messages.frontend compile", script)
+        self.assertIn('"--add-data"', script)
+        self.assertIn("dota_disabler/locales", script)
+        self.assertIn("DOTA2_COSMETIC_DISABLER_TEST_UI_LOCALE", script)
+        self.assertIn("Get-ChildItem -LiteralPath $localesRoot -Directory", script)
+        self.assertIn("foreach ($uiLocale in $packagedUiLocales)", script)
+
+    def test_translation_maintenance_covers_every_ui_keyword_and_validates_catalogs(self):
+        script = (PROJECT_ROOT / "scripts/update_translations.ps1").read_text(
+            encoding="utf-8"
+        )
+        for keyword in (
+            "_tr",
+            "translate",
+            "N_",
+            "ngettext:1,2",
+            "_set_translated_text:2",
+            "_show_status_error:2",
+        ):
+            self.assertIn(f'"--keyword={keyword}"', script)
+        self.assertIn('"--no-default-keywords"', script)
+        self.assertIn('"--no-fuzzy-matching"', script)
+        self.assertIn('"init"', script)
+        self.assertIn("tests.test_ui_i18n", script)
 
 
 class GitHubCommunityContractTests(unittest.TestCase):

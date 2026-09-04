@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-E85D4A?style=flat-square" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.1" src="https://img.shields.io/badge/version-0.9.1-E85D4A?style=flat-square" /></a>
   <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=flat-square" />
   <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;color=2EA043" /></a>
@@ -112,6 +112,8 @@ Remove the launch option to disable the generated override immediately. Use
 The dashboard can:
 
 - Detect a Dota installation or accept a manually selected path.
+- Display the dashboard in the system language, English, Russian, Simplified Chinese, or
+  Traditional Chinese using the language menu at the top right.
 - Show the installed Dota build, the build used by the current overrides, and their status.
 - Select a recognized language mount and any combination of supported categories.
 - Review the current category and language selection directly below the category toggles before
@@ -123,8 +125,11 @@ The dashboard can:
 - Open generated reports and output folders, or copy the required Steam launch option, after a
   usable override result is available.
 
-Language and category preferences are stored locally in `.work/ui-settings.json`. Keep the
-dashboard open while a build or cleanup is running.
+GUI language, compatibility mount, and category preferences are stored locally in
+`.work/ui-settings.json`. GUI-language changes apply immediately without restarting; existing
+activity-log entries keep the language in which they were recorded, while subsequent entries use
+the new selection. Keep the dashboard open while a build or cleanup is running. The language menu
+is disabled during those operations so their presentation cannot change midway through a task.
 
 ## Supported replacements
 
@@ -351,6 +356,26 @@ Run the application from source:
 python .\disable_cosmetics.py
 python .\disable_cosmetics.py build
 ```
+
+GUI translations live under `dota_disabler/locales`. After changing GUI text or editing a `.po`
+catalog, run the translation maintenance command:
+
+```powershell
+.\scripts\update_translations.ps1 -Python python
+```
+
+It extracts every marked GUI string into `ui.pot`, updates existing catalogs without fuzzy guesses,
+compiles them, and runs the catalog completeness tests. To start another language, use its locale
+code:
+
+```powershell
+.\scripts\update_translations.ps1 -Python python -AddLocale es
+```
+
+Translate every empty `msgstr` in the newly created `.po`, add a friendly autonym to
+`UI_LOCALE_NAMES` if desired, and rerun the command without `-AddLocale`. The release script embeds
+the compiled catalogs and automatically runs the packaged layout smoke test for every shipped
+locale.
 
 Analyze already extracted schemas without reading or modifying a Dota installation:
 

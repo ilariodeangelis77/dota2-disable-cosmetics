@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
 from . import gui_engine as engine
+from .ui_i18n import N_, UI_LOCALE_AUTO, normalize_ui_locale
 
 
 BG = "#0b0f15"
@@ -26,52 +28,67 @@ AMBER = "#f2b84b"
 BLUE = "#5da9e9"
 RED = "#ee6a68"
 
-SETTINGS_FORMAT_VERSION = 1
+SETTINGS_FORMAT_VERSION = 2
 SETTINGS_FILENAME = "ui-settings.json"
 
 LANGUAGE_NAMES = {
-    "brazilian": "Brazilian Portuguese",
-    "bulgarian": "Bulgarian",
-    "czech": "Czech",
-    "danish": "Danish",
-    "dutch": "Dutch",
-    "finnish": "Finnish",
-    "french": "French",
-    "german": "German",
-    "greek": "Greek",
-    "hungarian": "Hungarian",
-    "italian": "Italian",
-    "japanese": "Japanese",
-    "koreana": "Korean",
-    "latam": "Latin American Spanish",
-    "norwegian": "Norwegian",
-    "polish": "Polish",
-    "portuguese": "Portuguese",
-    "romanian": "Romanian",
-    "russian": "Russian",
-    "schinese": "Simplified Chinese",
-    "spanish": "Spanish",
-    "swedish": "Swedish",
-    "tchinese": "Traditional Chinese",
-    "thai": "Thai",
-    "turkish": "Turkish",
-    "ukrainian": "Ukrainian",
-    "vietnamese": "Vietnamese",
+    "brazilian": N_("Brazilian Portuguese"),
+    "bulgarian": N_("Bulgarian"),
+    "czech": N_("Czech"),
+    "danish": N_("Danish"),
+    "dutch": N_("Dutch"),
+    "finnish": N_("Finnish"),
+    "french": N_("French"),
+    "german": N_("German"),
+    "greek": N_("Greek"),
+    "hungarian": N_("Hungarian"),
+    "italian": N_("Italian"),
+    "japanese": N_("Japanese"),
+    "koreana": N_("Korean"),
+    "latam": N_("Latin American Spanish"),
+    "norwegian": N_("Norwegian"),
+    "polish": N_("Polish"),
+    "portuguese": N_("Portuguese"),
+    "romanian": N_("Romanian"),
+    "russian": N_("Russian"),
+    "schinese": N_("Simplified Chinese"),
+    "spanish": N_("Spanish"),
+    "swedish": N_("Swedish"),
+    "tchinese": N_("Traditional Chinese"),
+    "thai": N_("Thai"),
+    "turkish": N_("Turkish"),
+    "ukrainian": N_("Ukrainian"),
+    "vietnamese": N_("Vietnamese"),
 }
 
 
-def language_label(language: str) -> str:
-    name = LANGUAGE_NAMES[language]
-    return f"{name} — recommended" if language == engine.DEFAULT_LANGUAGE else name
+def _identity(message: str) -> str:
+    return message
 
 
-LANGUAGE_LABEL_TO_CODE = {
-    language_label(language): language
-    for language in sorted(
-        engine.RECOGNIZED_LANGUAGES,
-        key=lambda value: (value != engine.DEFAULT_LANGUAGE, LANGUAGE_NAMES[value]),
-    )
-}
+def language_label(
+    language: str,
+    translate: Callable[[str], str] = _identity,
+) -> str:
+    name = translate(LANGUAGE_NAMES[language])
+    if language == engine.DEFAULT_LANGUAGE:
+        return translate("{language} — recommended").format(language=name)
+    return name
+
+
+def language_choices(
+    translate: Callable[[str], str] = _identity,
+) -> dict[str, str]:
+    return {
+        language_label(language, translate): language
+        for language in sorted(
+            engine.RECOGNIZED_LANGUAGES,
+            key=lambda value: (value != engine.DEFAULT_LANGUAGE, LANGUAGE_NAMES[value]),
+        )
+    }
+
+
+LANGUAGE_LABEL_TO_CODE = language_choices()
 LANGUAGE_LABELS = tuple(LANGUAGE_LABEL_TO_CODE)
 
 
@@ -82,45 +99,57 @@ FEATURES = (
             engine.CATEGORY_STANDARD_WEARABLES,
             engine.CATEGORY_ADDITIONAL_WEARABLES,
         ),
-        "title": "Wearables & attachments",
-        "description": "Restore equipped items and attachments.",
-        "tag": "SUPPORTED",
+        "title": N_("Wearables & attachments"),
+        "description": N_("Restore equipped items and attachments."),
+        "tag": N_("SUPPORTED"),
     },
     {
         "key": "hero_transformations",
         "categories": (engine.CATEGORY_SPECIAL_MODELS,),
-        "title": "Hero transformations",
-        "description": "Restore transformations, pets & summons.",
-        "tag": "SUPPORTED",
+        "title": N_("Hero transformations"),
+        "description": N_("Restore transformations, pets & summons."),
+        "tag": N_("SUPPORTED"),
     },
     {
         "key": "persona_models",
         "categories": (engine.CATEGORY_PERSONA_MODELS,),
-        "title": "Personas",
-        "description": "Restore Persona models; still experimental.",
-        "tag": "EXPERIMENTAL",
+        "title": N_("Personas"),
+        "description": N_("Restore Persona models; still experimental."),
+        "tag": N_("EXPERIMENTAL"),
     },
     {
         "key": "particle_effects",
         "categories": (engine.CATEGORY_PARTICLE_EFFECTS,),
-        "title": "Particles & effects",
-        "description": "Restore default particles and effects.",
-        "tag": "SUPPORTED",
+        "title": N_("Particles & effects"),
+        "description": N_("Restore default particles and effects."),
+        "tag": N_("SUPPORTED"),
     },
 )
+
+OPERATION_NAMES = {
+    "detect": N_("Detect"),
+    "status": N_("Status"),
+    "build": N_("Build"),
+    "clean": N_("Clean"),
+}
 
 
 def settings_file() -> Path:
     return engine.application_root() / ".work" / SETTINGS_FILENAME
 
 
-def load_ui_settings(path: Optional[Path] = None) -> dict:
-    default = {
+def _default_ui_settings() -> dict:
+    return {
         "format_version": SETTINGS_FORMAT_VERSION,
         "dota_path": None,
         "enabled_categories": sorted(engine.DEFAULT_CATEGORIES),
-        "language": engine.DEFAULT_LANGUAGE,
+        "ui_locale": UI_LOCALE_AUTO,
+        "compatibility_language": engine.DEFAULT_LANGUAGE,
     }
+
+
+def load_ui_settings(path: Optional[Path] = None) -> dict:
+    default = _default_ui_settings()
     source = path or settings_file()
     if not source.is_file():
         return default
@@ -128,11 +157,22 @@ def load_ui_settings(path: Optional[Path] = None) -> dict:
         payload = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return default
-    if not isinstance(payload, dict) or payload.get("format_version") != SETTINGS_FORMAT_VERSION:
+    if not isinstance(payload, dict):
+        return default
+    format_version = payload.get("format_version")
+    if format_version not in {1, SETTINGS_FORMAT_VERSION}:
         return default
     dota_path = payload.get("dota_path")
     categories = payload.get("enabled_categories")
-    language_value = payload.get("language", engine.DEFAULT_LANGUAGE)
+    compatibility_language_value = payload.get(
+        "language" if format_version == 1 else "compatibility_language",
+        engine.DEFAULT_LANGUAGE,
+    )
+    ui_locale_value = (
+        UI_LOCALE_AUTO
+        if format_version == 1
+        else payload.get("ui_locale", UI_LOCALE_AUTO)
+    )
     if dota_path is not None and not isinstance(dota_path, str):
         dota_path = None
     if not isinstance(categories, list) or not all(
@@ -141,18 +181,27 @@ def load_ui_settings(path: Optional[Path] = None) -> dict:
         categories = list(engine.DEFAULT_CATEGORIES)
     selected = sorted(set(categories).intersection(engine.SUPPORTED_CATEGORIES))
     try:
-        language = (
-            engine.validate_language(language_value)
-            if isinstance(language_value, str)
+        compatibility_language = (
+            engine.validate_language(compatibility_language_value)
+            if isinstance(compatibility_language_value, str)
             else engine.DEFAULT_LANGUAGE
         )
     except ValueError:
-        language = engine.DEFAULT_LANGUAGE
+        compatibility_language = engine.DEFAULT_LANGUAGE
+    try:
+        ui_locale = (
+            normalize_ui_locale(ui_locale_value)
+            if isinstance(ui_locale_value, str)
+            else UI_LOCALE_AUTO
+        )
+    except ValueError:
+        ui_locale = UI_LOCALE_AUTO
     return {
         "format_version": SETTINGS_FORMAT_VERSION,
         "dota_path": dota_path,
         "enabled_categories": selected,
-        "language": language,
+        "ui_locale": ui_locale,
+        "compatibility_language": compatibility_language,
     }
 
 
@@ -161,15 +210,24 @@ def save_ui_settings(
     categories: set[str],
     path: Optional[Path] = None,
     *,
-    language: str = engine.DEFAULT_LANGUAGE,
+    compatibility_language: str = engine.DEFAULT_LANGUAGE,
+    ui_locale: str = UI_LOCALE_AUTO,
+    language: Optional[str] = None,
 ) -> None:
+    # Preserve the old keyword for source callers while new code uses the
+    # unambiguous compatibility-language name.
+    if language is not None:
+        compatibility_language = language
     engine.write_json(
         path or settings_file(),
         {
             "format_version": SETTINGS_FORMAT_VERSION,
             "dota_path": dota_path or None,
             "enabled_categories": sorted(categories),
-            "language": engine.validate_language(language),
+            "ui_locale": normalize_ui_locale(ui_locale),
+            "compatibility_language": engine.validate_language(
+                compatibility_language
+            ),
         },
     )
 
@@ -205,44 +263,45 @@ def status_matches_path(result: dict, dota_path: str) -> bool:
 def status_presentation(
     result: dict,
     selected_categories: Optional[set[str]] = None,
+    translate: Callable[[str], str] = _identity,
 ) -> dict[str, str]:
     state = result.get("status", "unknown")
     presentations = {
         "current": (
-            "CURRENT",
+            translate("CURRENT"),
             GREEN,
-            "Installed Dota build matches the build used for these overrides",
-            "Rebuild Overrides",
+            translate("Installed Dota build matches the build used for these overrides"),
+            translate("Rebuild Overrides"),
         ),
         "stale": (
-            "UPDATE FOUND",
+            translate("UPDATE FOUND"),
             AMBER,
-            "Installed Dota build changed since the last build",
-            "Rebuild for Installed Build",
+            translate("Installed Dota build changed since the last build"),
+            translate("Rebuild for Installed Build"),
         ),
         "legacy": (
-            "REBUILD REQUIRED",
+            translate("REBUILD REQUIRED"),
             RED,
-            "Legacy loose overrides are no longer loaded by current Dota",
-            "Build VPK Overrides",
+            translate("Legacy loose overrides are no longer loaded by current Dota"),
+            translate("Build VPK Overrides"),
         ),
         "broken": (
-            "REPAIR REQUIRED",
+            translate("REPAIR REQUIRED"),
             RED,
-            "The owned VPK is missing or failed its checksum check",
-            "Repair Overrides",
+            translate("The owned VPK is missing or failed its checksum check"),
+            translate("Repair Overrides"),
         ),
         "not_built": (
-            "NOT BUILT",
+            translate("NOT BUILT"),
             BLUE,
-            "No owned disabler build marker was found",
-            "Build Overrides",
+            translate("No owned disabler build marker was found"),
+            translate("Build Overrides"),
         ),
         "unknown": (
-            "CHECK NEEDED",
+            translate("CHECK NEEDED"),
             AMBER,
-            "The previous run has no comparable Dota-build record",
-            "Rebuild Overrides",
+            translate("The previous run has no comparable Dota-build record"),
+            translate("Rebuild Overrides"),
         ),
     }
     badge, color, detail, action = presentations.get(state, presentations["unknown"])
@@ -255,10 +314,10 @@ def status_presentation(
         and set(recorded_categories) != selected_categories
     ):
         badge, color, detail, action = (
-            "CHANGES PENDING",
+            translate("CHANGES PENDING"),
             AMBER,
-            "Category selection changed; rebuild to apply it",
-            "Apply Selection",
+            translate("Category selection changed; rebuild to apply it"),
+            translate("Apply Selection"),
         )
     return {"badge": badge, "color": color, "detail": detail, "action": action}
 
@@ -277,6 +336,7 @@ __all__ = [
     "LANGUAGE_LABEL_TO_CODE",
     "LANGUAGE_NAMES",
     "MUTED",
+    "OPERATION_NAMES",
     "RED",
     "SETTINGS_FILENAME",
     "SETTINGS_FORMAT_VERSION",
@@ -285,7 +345,9 @@ __all__ = [
     "SURFACE_HOVER",
     "TEXT",
     "TEXT_SOFT",
+    "UI_LOCALE_AUTO",
     "engine",
+    "language_choices",
     "language_label",
     "load_ui_settings",
     "resolve_initial_dota",

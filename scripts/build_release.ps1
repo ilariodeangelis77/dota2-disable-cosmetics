@@ -39,6 +39,7 @@ $extractorFilename = "Dota2VpkExtractor$executableSuffix"
 $modelPatcherFilename = "Dota2ModelSkinPatcher$executableSuffix"
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$localesRoot = Join-Path $projectRoot "dota_disabler/locales"
 $buildRoot = Join-Path $projectRoot "build"
 $extractorOutput = Join-Path $buildRoot "vpk-extractor"
 $modelPatcherOutput = Join-Path $buildRoot "model-patcher"
@@ -77,6 +78,14 @@ try {
     & $Python -c "import tkinter as tk; root = tk.Tk(); root.withdraw(); root.update_idletasks(); root.destroy()"
     if ($LASTEXITCODE -ne 0) {
         throw "The selected Python runtime does not have a working Tcl/Tk installation."
+    }
+
+    & $Python -m babel.messages.frontend compile `
+        --directory $localesRoot `
+        --domain ui `
+        --statistics
+    if ($LASTEXITCODE -ne 0) {
+        throw "The GUI translation catalogs could not be compiled."
     }
 
     & $dotnet publish "tools/VpkExtractor/VpkExtractor.csproj" `
@@ -149,6 +158,7 @@ try {
         "--specpath", $buildRoot,
         "--add-binary", "${extractorBinary}${binarySeparator}tools",
         "--add-binary", "${modelPatcherBinary}${binarySeparator}tools",
+        "--add-data", "${localesRoot}${binarySeparator}dota_disabler/locales",
         "disable_cosmetics.py"
     )
     & $Python @pyInstallerArguments
@@ -189,9 +199,26 @@ try {
         throw "The packaged application failed its version smoke test."
     }
 
-    & $releaseBinary gui --smoke-test
-    if ($LASTEXITCODE -ne 0) {
-        throw "The packaged desktop UI failed its smoke test."
+    $packagedUiLocales = @("en")
+    $packagedUiLocales += Get-ChildItem -LiteralPath $localesRoot -Directory |
+        Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.FullName "LC_MESSAGES/ui.mo") -PathType Leaf
+        } |
+        ForEach-Object { $_.Name.Replace("_", "-") }
+    $packagedUiLocales = @($packagedUiLocales | Sort-Object -Unique)
+
+    $previousTestUiLocale = $env:DOTA2_COSMETIC_DISABLER_TEST_UI_LOCALE
+    try {
+        foreach ($uiLocale in $packagedUiLocales) {
+            $env:DOTA2_COSMETIC_DISABLER_TEST_UI_LOCALE = $uiLocale
+            & $releaseBinary gui --smoke-test
+            if ($LASTEXITCODE -ne 0) {
+                throw "The packaged desktop UI failed its '$uiLocale' smoke test."
+            }
+        }
+    }
+    finally {
+        $env:DOTA2_COSMETIC_DISABLER_TEST_UI_LOCALE = $previousTestUiLocale
     }
 
     $previousPackagedApplication = $env:DOTA2_COSMETIC_DISABLER_EXE

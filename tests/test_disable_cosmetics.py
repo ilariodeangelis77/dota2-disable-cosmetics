@@ -3421,7 +3421,8 @@ class GuiViewModelTests(unittest.TestCase):
                 "D:/Steam/dota 2 beta",
                 {generator.CATEGORY_PERSONA_MODELS},
                 path,
-                language="finnish",
+                compatibility_language="finnish",
+                ui_locale="zh_CN",
             )
             self.assertEqual(
                 disabler_gui.load_ui_settings(path),
@@ -3429,20 +3430,55 @@ class GuiViewModelTests(unittest.TestCase):
                     "format_version": disabler_gui.SETTINGS_FORMAT_VERSION,
                     "dota_path": "D:/Steam/dota 2 beta",
                     "enabled_categories": [generator.CATEGORY_PERSONA_MODELS],
-                    "language": "finnish",
+                    "ui_locale": "zh-Hans",
+                    "compatibility_language": "finnish",
                 },
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
-            payload["language"] = "defaultmodels"
+            payload["compatibility_language"] = "defaultmodels"
+            payload["ui_locale"] = "../invalid"
             path.write_text(json.dumps(payload), encoding="utf-8")
             self.assertEqual(
-                disabler_gui.load_ui_settings(path)["language"],
+                disabler_gui.load_ui_settings(path)["compatibility_language"],
                 generator.DEFAULT_LANGUAGE,
+            )
+            self.assertEqual(
+                disabler_gui.load_ui_settings(path)["ui_locale"],
+                disabler_gui.UI_LOCALE_AUTO,
             )
             path.write_text("not json", encoding="utf-8")
             fallback = disabler_gui.load_ui_settings(path)
             self.assertEqual(set(fallback["enabled_categories"]), generator.DEFAULT_CATEGORIES)
-            self.assertEqual(fallback["language"], generator.DEFAULT_LANGUAGE)
+            self.assertEqual(
+                fallback["compatibility_language"], generator.DEFAULT_LANGUAGE
+            )
+            self.assertEqual(fallback["ui_locale"], disabler_gui.UI_LOCALE_AUTO)
+
+    def test_version_one_settings_migrate_without_losing_preferences(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / disabler_gui.SETTINGS_FILENAME
+            path.write_text(
+                json.dumps(
+                    {
+                        "format_version": 1,
+                        "dota_path": "D:/Steam/dota 2 beta",
+                        "enabled_categories": [generator.CATEGORY_PARTICLE_EFFECTS],
+                        "language": "russian",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                disabler_gui.load_ui_settings(path),
+                {
+                    "format_version": disabler_gui.SETTINGS_FORMAT_VERSION,
+                    "dota_path": "D:/Steam/dota 2 beta",
+                    "enabled_categories": [generator.CATEGORY_PARTICLE_EFFECTS],
+                    "ui_locale": disabler_gui.UI_LOCALE_AUTO,
+                    "compatibility_language": "russian",
+                },
+            )
 
     def test_language_choices_cover_every_recognized_mount_with_dutch_first(self):
         self.assertEqual(
@@ -3453,6 +3489,18 @@ class GuiViewModelTests(unittest.TestCase):
             disabler_gui.LANGUAGE_LABEL_TO_CODE[disabler_gui.LANGUAGE_LABELS[0]],
             generator.DEFAULT_LANGUAGE,
         )
+
+    def test_compatibility_language_choices_can_be_localized(self):
+        translations = {
+            "Dutch": "Nederlands",
+            "{language} — recommended": "{language} — aanbevolen",
+        }
+        choices = disabler_gui.language_choices(
+            lambda message: translations.get(message, message)
+        )
+
+        self.assertEqual(choices["Nederlands — aanbevolen"], "dutch")
+        self.assertEqual(set(choices.values()), generator.RECOGNIZED_LANGUAGES)
 
     def test_statuses_map_to_clear_ui_actions(self):
         current = disabler_gui.status_presentation({"status": "current"})
@@ -3486,6 +3534,19 @@ class GuiViewModelTests(unittest.TestCase):
             {generator.CATEGORY_PERSONA_MODELS},
         )
         self.assertEqual(stale_with_selection_changes["badge"], "UPDATE FOUND")
+
+    def test_status_presentation_uses_the_selected_translator(self):
+        translations = {
+            "CURRENT": "ACTUEEL",
+            "Rebuild Overrides": "Overrides opnieuw bouwen",
+        }
+        view = disabler_gui.status_presentation(
+            {"status": "current"},
+            translate=lambda message: translations.get(message, message),
+        )
+
+        self.assertEqual(view["badge"], "ACTUEEL")
+        self.assertEqual(view["action"], "Overrides opnieuw bouwen")
 
     def test_feature_tiles_group_internal_categories_without_hiding_personas(self):
         self.assertEqual(
