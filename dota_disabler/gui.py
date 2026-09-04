@@ -508,7 +508,13 @@ class DisablerApp:
             fg=MUTED,
             font=FONT_BODY_SMALL,
         )
-        self.header_subtitle.grid(row=1, column=1, sticky="nw", pady=(2, 0))
+        self.header_subtitle.grid(
+            row=1,
+            column=1,
+            columnspan=4,
+            sticky="nw",
+            pady=(2, 0),
+        )
         self._set_translated_text(
             self.header_subtitle,
             "Local model & effect overrides  ·  v{version}  ·  no injection",
@@ -524,7 +530,7 @@ class DisablerApp:
             padx=9,
             pady=6,
         )
-        self.header_status.grid(row=0, column=3, rowspan=2, sticky="e", padx=(10, 0))
+        self.header_status.grid(row=0, column=3, sticky="e", padx=(10, 0))
         self._set_translated_text(
             self.header_status,
             "DETECTING",
@@ -537,14 +543,13 @@ class DisablerApp:
             command=self._refresh_status,
             compact=True,
         )
-        self.refresh_button.grid(row=0, column=4, rowspan=2, sticky="e", padx=(10, 0))
+        self.refresh_button.grid(row=0, column=4, sticky="e", padx=(10, 0))
         self._set_translated_text(self.refresh_button, "Refresh")
 
         self.ui_locale_frame = tk.Frame(header, bg=BG)
         self.ui_locale_frame.grid(
             row=0,
             column=2,
-            rowspan=2,
             sticky="e",
             padx=(12, 0),
         )
