@@ -85,6 +85,13 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("self.progress.start(", gui)
         self.assertNotIn("self.progress.stop(", gui)
 
+    def test_desktop_smoke_covers_responsive_minimum_width(self):
+        gui = (PROJECT_ROOT / "dota_disabler/gui.py").read_text(encoding="utf-8")
+
+        self.assertIn('root.geometry("1024x700+10000+10000")', gui)
+        self.assertNotIn('uniform="workspace"', gui)
+        self.assertIn("width=1,", gui)
+
     def test_native_release_matrix_and_archive_formats_are_kept(self):
         workflow = (PROJECT_ROOT / ".github/workflows/build-releases.yml").read_text(
             encoding="utf-8"

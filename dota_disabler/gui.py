@@ -462,8 +462,11 @@ class DisablerApp:
         self._build_header()
         workspace = tk.Frame(self.root, bg=BG)
         workspace.grid(row=1, column=0, sticky="nsew", padx=24, pady=(8, 18))
-        workspace.grid_columnconfigure(0, weight=5, uniform="workspace")
-        workspace.grid_columnconfigure(1, weight=7, uniform="workspace")
+        # Let each pane keep its requested minimum before distributing spare
+        # width. A uniform group forces the 5:7 ratio even on narrow desktops
+        # and can compress the controls below their content width.
+        workspace.grid_columnconfigure(0, weight=5)
+        workspace.grid_columnconfigure(1, weight=7)
         workspace.grid_rowconfigure(0, weight=1)
         self.workspace = workspace
 
@@ -900,7 +903,13 @@ class DisablerApp:
         )
         self.progress_label.grid(row=0, column=1, padx=(8, 4))
         self.result_actions = tk.Frame(activity_header, bg=SURFACE)
-        self.result_actions.grid(row=0, column=2, padx=(8, 0))
+        self.result_actions.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(6, 0),
+        )
         self.open_report_button = FlatButton(
             self.result_actions,
             text="",
@@ -949,6 +958,7 @@ class DisablerApp:
         self.log = tk.Text(
             panel,
             height=2,
+            width=1,
             bg="#0d131b",
             fg=TEXT_SOFT,
             insertbackground=TEXT,
@@ -1634,9 +1644,12 @@ def _assert_localized_layout(app: DisablerApp) -> None:
         ("header", app.header),
         ("controls column", app.controls_column),
     ):
-        if container.winfo_reqwidth() > container.winfo_width() + 2:
+        requested_width = container.winfo_reqwidth()
+        allocated_width = container.winfo_width()
+        if requested_width > allocated_width + 2:
             raise RuntimeError(
-                f"GUI {name} overflows for locale {app.translator.locale}"
+                f"GUI {name} overflows for locale {app.translator.locale}: "
+                f"requested {requested_width}px, allocated {allocated_width}px"
             )
     clipped: list[str] = []
     pending = list(app.root.winfo_children())
@@ -1797,7 +1810,10 @@ def run_gui(*, smoke_test: bool = False) -> int:
         ui_locale_override=smoke_locale,
     )
     if smoke_test:
-        root.geometry("1280x700+10000+10000")
+        # Exercise the supported minimum width. Some hosted desktops clamp an
+        # off-screen 1280px window to 1024px even when a larger geometry is
+        # requested, which previously exposed real pane compression here.
+        root.geometry("1024x700+10000+10000")
         root.deiconify()
         root.update()
         if smoke_locale is not None and app.translator.locale != smoke_locale:
