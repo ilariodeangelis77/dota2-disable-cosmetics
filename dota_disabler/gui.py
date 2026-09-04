@@ -498,6 +498,8 @@ class DisablerApp:
             bg=BG,
             fg=TEXT,
             font=FONT_TITLE,
+            justify="left",
+            wraplength=260,
         )
         self.header_title.grid(row=0, column=1, sticky="sw")
         self._set_translated_text(self.header_title, "COSMETIC DISABLER")

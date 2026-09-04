@@ -90,6 +90,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
 
         self.assertIn('root.geometry("1024x700+10000+10000")', gui)
         self.assertNotIn('uniform="workspace"', gui)
+        self.assertIn("wraplength=260,", gui)
         self.assertIn("width=1,", gui)
 
     def test_native_release_matrix_and_archive_formats_are_kept(self):
