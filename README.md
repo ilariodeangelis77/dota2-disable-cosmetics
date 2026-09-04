@@ -6,15 +6,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;logo=github&amp;color=E85D4A" /></a>
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;logo=github&amp;color=DCA64C" /></a>
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=for-the-badge&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest"><img alt="Download latest release" src="https://img.shields.io/badge/Download-Latest%20release-2EA043?style=for-the-badge&amp;logo=github&amp;logoColor=white" /></a>
+  <br />
+  <sub>Windows, Linux, and macOS — choose the archive for your platform.</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-E85D4A?style=for-the-badge" /></a>
-  <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=for-the-badge" />
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=for-the-badge&amp;color=2EA043" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;color=2EA043" /></a>
 </p>
 
 <p align="center">
@@ -26,12 +25,6 @@
   · <a href="#development">Build from source</a>
   · <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues/new/choose">Report a bug</a>
 </p>
-
-<p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases/latest"><img alt="Download latest release" src="https://img.shields.io/badge/Download-Latest%20release-2EA043?style=for-the-badge&amp;logo=github&amp;logoColor=white" /></a>
-</p>
-
-<p align="center"><sub>Windows, Linux, and macOS - choose the archive for your platform.</sub></p>
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Dota 2 Cosmetic Disabler desktop dashboard" width="100%" />
