@@ -923,7 +923,7 @@ class DisablerApp:
             command=self._open_report,
             compact=True,
         )
-        self.open_report_button.pack(side="left")
+        self.open_report_button.grid(row=0, column=0, sticky="w")
         self._set_translated_text(self.open_report_button, "Report")
         self.open_output_button = FlatButton(
             self.result_actions,
@@ -931,7 +931,7 @@ class DisablerApp:
             command=self._open_output,
             compact=True,
         )
-        self.open_output_button.pack(side="left", padx=(8, 0))
+        self.open_output_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self._set_translated_text(self.open_output_button, "Output")
         self.copy_launch_button = FlatButton(
             self.result_actions,
@@ -939,7 +939,13 @@ class DisablerApp:
             command=self._copy_launch_option,
             compact=True,
         )
-        self.copy_launch_button.pack(side="left", padx=(8, 0))
+        self.copy_launch_button.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(6, 0),
+        )
         self._set_translated_text(
             self.copy_launch_button,
             "Copy launch option",
@@ -1899,6 +1905,8 @@ def run_gui(*, smoke_test: bool = False) -> int:
         app._set_result_actions_visible(True)
         if not app.result_actions.grid_info():
             raise RuntimeError("GUI result actions could not be revealed contextually.")
+        if app.copy_launch_button.grid_info().get("row") != 1:
+            raise RuntimeError("GUI result actions do not wrap at minimum width.")
         root.update_idletasks()
         _assert_localized_layout(app)
         app._set_busy(True, "Packing files")
