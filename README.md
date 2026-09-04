@@ -12,8 +12,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-E85D4A?style=flat-square" /></a>
+  <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=flat-square" />
   <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;color=2EA043" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;logo=github&amp;color=E85D4A" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;logo=github&amp;color=DCA64C" /></a>
 </p>
 
 <p align="center">
