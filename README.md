@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.1" src="https://img.shields.io/badge/version-0.9.1-E85D4A?style=flat-square" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.2" src="https://img.shields.io/badge/version-0.9.2-E85D4A?style=flat-square" /></a>
   <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=flat-square" />
   <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;color=2EA043" /></a>
@@ -256,8 +256,10 @@ language to `build`, `status`, and `clean`, and update the Steam launch option a
 ```
 
 The selected language is a compatibility mount, not the desired interface language. The build
-derives matching English localization files from the installed game so that the interface remains
-English. The `english` CLI alias resolves to the recommended Dutch mount.
+reads Dota's language selection from Steam and remaps the matching localization files into the
+compatibility mount, including loose Source 2 core and Hero Demo catalogs. English is used only
+when the selected language has no matching catalog. The `english` CLI alias resolves to the
+recommended Dutch mount; it does not force Dota's interface to English.
 
 The default generated archive is:
 
@@ -266,6 +268,15 @@ The default generated archive is:
 ```
 
 If `pak98` is occupied, the tool selects the next available owned slot down to `pak90`.
+Hero Demo requires one additional catalog because Dota mounts add-on languages separately:
+
+```text
+<dota 2 beta>\game\dota_dutch_addons\hero_demo\resource\addon_dutch.txt
+```
+
+That exact text file is recorded with its SHA-256 alongside the VPK, replaced transactionally,
+and removed conservatively. The tool does not recursively remove the add-on language directory or
+touch unrelated files in it.
 
 ### Check for Dota updates
 
@@ -279,12 +290,12 @@ Possible results are:
 
 | Status | Meaning |
 | --- | --- |
-| `CURRENT` | The installed Dota version matches the version used for the overrides. |
-| `STALE` | Dota changed after the last successful build; rebuild the overrides. |
+| `CURRENT` | The installed Dota version and Steam language match the override build. |
+| `STALE` | Dota or its Steam-selected language changed; rebuild the overrides. |
 | `UNKNOWN` | The existing build has no comparable version record; build once to add one. |
 | `NOT BUILT` | No owned marker exists for the selected language. |
 | `LEGACY` | Only an obsolete loose-file deployment exists; rebuild to migrate it. |
-| `BROKEN` | The owned archive is missing or does not match its recorded SHA-256. |
+| `BROKEN` | An owned override file is missing or does not match its recorded SHA-256. |
 
 Add `--json` for machine-readable status output. Successful builds are also recorded in
 `.work/dota-version-history.json`; use `history --limit 25` or `history --json` to inspect them.
@@ -314,7 +325,8 @@ not available.
    Dota VPK.
 2. The planner derives default models and effects, resolves conflicts deterministically, and writes
    a reviewable mapping report.
-3. Only required resources and English localization compatibility files are extracted.
+3. Only required resources and localization compatibility files for Dota's Steam-selected
+   interface language are extracted.
 4. Skin-sensitive model copies receive duplicate base-material groups when a selected style index
    would otherwise render an error material. Reviewed model-less wearable proxies can use composed
    compatible defaults. Reviewed particle-bodied heroes can receive a private default-particle

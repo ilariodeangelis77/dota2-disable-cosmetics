@@ -56,6 +56,7 @@ from .versioning import (
     capture_dota_version,
     compare_dota_versions,
     dota_changed_during_build,
+    dota_interface_language,
     dota_operation_lock,
     dota_version_label,
     find_dota_install,
@@ -215,6 +216,7 @@ def _build_cosmetics_unlocked(
             f"WARNING: Existing version history is invalid and will not be overwritten: {exc}"
         )
     current_version = capture_dota_version(dota)
+    interface_language = dota_interface_language(current_version)
     previous_marker = read_marker(output_root, allow_shared_directory=True)
     validate_category_transition(
         previous_marker,
@@ -228,6 +230,7 @@ def _build_cosmetics_unlocked(
 
     progress(f"Dota: {dota}")
     progress(f"Current Dota version: {dota_version_label(current_version)}")
+    progress(f"Dota interface language: {interface_language}")
     if current_version.get("steam_manifest_error"):
         warning(
             "WARNING: Steam build metadata could not be read; using the VPK stamp instead: "
@@ -235,6 +238,8 @@ def _build_cosmetics_unlocked(
         )
     elif not current_version.get("steam_build_id"):
         progress("NOTE: Steam build metadata was not found; using the VPK stamp instead.")
+    if current_version.get("steam_language_error"):
+        warning(f"WARNING: {current_version['steam_language_error']}")
     if previous_marker:
         comparison, basis = compare_dota_versions(
             previous_marker.get("dota_version"),
@@ -429,10 +434,12 @@ def _build_cosmetics_unlocked(
         extractor=extractor,
         model_patcher=model_patcher,
         game_pak=pak,
+        dota_root=dota,
         items_schema=items_path,
         clean_first=options.clean_first,
         allow_missing=options.allow_missing,
         language=language,
+        interface_language=interface_language,
         dota_version=current_version,
         generated_at_utc=built_at_utc,
         enabled_categories=enabled_categories,
@@ -464,6 +471,7 @@ def _build_cosmetics_unlocked(
             "generator_version": VERSION,
             "deployment_mode": VPK_DEPLOYMENT_MODE,
             "language": language,
+            "interface_language": interface_language,
             "resource_overrides": copied,
             "model_overrides": plan.stats["model_overrides"],
             "particle_overrides": plan.stats["particle_overrides"],

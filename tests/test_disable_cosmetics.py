@@ -75,7 +75,7 @@ class KeyValuesTests(unittest.TestCase):
 
 class DotaVersionTests(unittest.TestCase):
     @staticmethod
-    def make_dota(root, *, build_id="12345678"):
+    def make_dota(root, *, build_id="12345678", language="english"):
         dota = root / "steamapps/common/dota 2 beta"
         pak = dota / "game/dota/pak01_dir.vpk"
         pak.parent.mkdir(parents=True)
@@ -88,6 +88,10 @@ class DotaVersionTests(unittest.TestCase):
     "name" "Dota 2"
     "buildid" "{build_id}"
     "LastUpdated" "1770000000"
+    "UserConfig"
+    {{
+        "language" "{language}"
+    }}
 }}
 ''',
             encoding="utf-8",
@@ -101,6 +105,7 @@ class DotaVersionTests(unittest.TestCase):
             self.assertEqual(version["steam_build_id"], "12345678")
             self.assertEqual(version["steam_last_updated_unix"], "1770000000")
             self.assertEqual(version["steam_manifest_path"], str(manifest))
+            self.assertEqual(version["steam_language"], "english")
             self.assertGreater(version["pak01_dir"]["size_bytes"], 0)
             self.assertIsInstance(version["pak01_dir"]["mtime_ns"], int)
 
@@ -128,6 +133,27 @@ class DotaVersionTests(unittest.TestCase):
             ("same", "pak01_dir.vpk size and modification time"),
         )
         self.assertFalse(generator.dota_changed_during_build(first, changed))
+
+    def test_steam_language_is_detected_and_compared_independently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            dota, _manifest = self.make_dota(Path(temporary), language="french")
+            french = generator.capture_dota_version(dota)
+            self.assertEqual(french["steam_language"], "french")
+            self.assertEqual(generator.dota_interface_language(french), "french")
+
+            english = dict(french, steam_language="english")
+            self.assertEqual(
+                generator.compare_dota_versions(french, english),
+                ("different", "Steam Dota language"),
+            )
+            self.assertTrue(generator.dota_changed_during_build(french, english))
+
+    def test_unknown_steam_language_falls_back_to_english(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            dota, _manifest = self.make_dota(Path(temporary), language="not-a-dota-locale")
+            version = generator.capture_dota_version(dota)
+            self.assertEqual(version["steam_language"], "english")
+            self.assertIn("Unsupported Steam language", version["steam_language_error"])
 
     def test_history_is_append_only(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -169,6 +195,7 @@ class DotaVersionTests(unittest.TestCase):
                     "generator_version": generator.VERSION,
                     "deployment_mode": generator.VPK_DEPLOYMENT_MODE,
                     "language": generator.DEFAULT_LANGUAGE,
+                    "interface_language": "english",
                     "generated_at_utc": "2026-08-20T00:00:00+00:00",
                     "dota_version": generator.capture_dota_version(dota),
                     "files": [archive.name],
@@ -218,6 +245,46 @@ class DotaVersionTests(unittest.TestCase):
             result = generator.get_status(str(dota))
             self.assertEqual(result["status"], "broken")
             self.assertFalse(result["archive_valid"])
+
+    def test_status_reports_stale_when_steam_language_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota, manifest = self.make_dota(root, language="french")
+            output = dota / f"game/dota_{generator.DEFAULT_LANGUAGE}"
+            output.mkdir()
+            archive = output / generator.VPK_ARCHIVE_CANDIDATES[0]
+            archive.write_bytes(b"owned VPK fixture")
+            generator.write_json(
+                output / generator.MARKER_FILENAME,
+                {
+                    "kind": generator.MARKER_KIND,
+                    "generator_version": generator.VERSION,
+                    "deployment_mode": generator.VPK_DEPLOYMENT_MODE,
+                    "language": generator.DEFAULT_LANGUAGE,
+                    "interface_language": "french",
+                    "dota_version": generator.capture_dota_version(dota),
+                    "files": [archive.name],
+                    "resources": [],
+                    "archive_sha256": generator.sha256_file(archive),
+                },
+            )
+            manifest.write_text(
+                '''"AppState"
+{
+    "appid" "570"
+    "buildid" "12345678"
+    "UserConfig" { "language" "german" }
+}
+''',
+                encoding="utf-8",
+            )
+
+            result = generator.get_status(str(dota))
+
+            self.assertEqual(result["status"], "stale")
+            self.assertEqual(result["comparison_basis"], "Steam Dota language")
+            self.assertEqual(result["recorded_interface_language"], "french")
+            self.assertEqual(result["current_interface_language"], "german")
 
     def test_default_language_is_recognized_and_arbitrary_names_are_rejected(self):
         self.assertEqual(generator.validate_language("english"), generator.DEFAULT_LANGUAGE)
@@ -3631,11 +3698,14 @@ class GuiViewModelTests(unittest.TestCase):
         legacy = disabler_gui.status_presentation({"status": "legacy"})
         broken = disabler_gui.status_presentation({"status": "broken"})
         self.assertEqual(current["badge"], "CURRENT")
+        self.assertIn("Steam language", current["detail"])
         self.assertIn("Installed Build", stale["action"])
+        self.assertIn("Steam language", stale["detail"])
         self.assertEqual(not_built["action"], "Build Overrides")
         self.assertEqual(unknown["badge"], "CHECK NEEDED")
         self.assertEqual(legacy["badge"], "REBUILD REQUIRED")
         self.assertEqual(broken["action"], "Repair Overrides")
+        self.assertIn("override file", broken["detail"])
 
         pending = disabler_gui.status_presentation(
             {
@@ -4230,6 +4300,77 @@ class DeploymentTests(unittest.TestCase):
             self.assertTrue(official.is_file())
             self.assertFalse((output / "pak98_dir.vpk").exists())
 
+    def test_deploy_preserves_steam_language_for_core_and_hero_demo_then_cleans_owned_files(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            cache = root / "cache"
+            work = root / "work"
+            output = dota / "game/dota_dutch"
+            source = cache / "models/heroes/test/default.vmdl_c"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"compiled model")
+
+            core = dota / "game/core/resource"
+            core.mkdir(parents=True)
+            (core / "valve_english.txt").write_bytes(b"English camera labels")
+            (core / "valve_french.txt").write_bytes(b"French camera labels")
+            hero_demo = dota / "game/dota_addons/hero_demo/resource"
+            hero_demo.mkdir(parents=True)
+            (hero_demo / "addon_english.txt").write_bytes(b"English Hero Demo")
+            (hero_demo / "addon_french.txt").write_bytes(b"French Hero Demo")
+            language_addons = dota / "game/dota_dutch_addons"
+            language_addons.mkdir(parents=True)
+            sentinel = language_addons / "keep-me.txt"
+            sentinel.write_text("unowned", encoding="utf-8")
+
+            copied, missing = generator.deploy_overrides(
+                self.make_plan(),
+                cache,
+                output,
+                work,
+                extractor=extractor,
+                dota_root=dota,
+                clean_first=True,
+                allow_missing=False,
+                language="dutch",
+                interface_language="french",
+                progress=lambda _message: None,
+            )
+
+            self.assertEqual((copied, missing), (1, []))
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            self.assertEqual(marker["interface_language"], "french")
+            self.assertEqual(marker["support_resources"], ["resource/valve_dutch.txt"])
+            self.assertEqual(
+                marker["addon_support_files"][0]["path"],
+                "dota_dutch_addons/hero_demo/resource/addon_dutch.txt",
+            )
+            addon_target = (
+                dota
+                / "game/dota_dutch_addons/hero_demo/resource/addon_dutch.txt"
+            )
+            self.assertEqual(addon_target.read_bytes(), b"French Hero Demo")
+            unpacked = root / "unpacked-language"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                ["resource/valve_dutch.txt"],
+                unpacked,
+            )
+            self.assertEqual(
+                (unpacked / "resource/valve_dutch.txt").read_bytes(),
+                b"French camera labels",
+            )
+
+            removed = generator.clean_output(output, allow_shared_directory=True)
+            self.assertEqual(removed, 2)
+            self.assertFalse(addon_target.exists())
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "unowned")
+
     def test_skin_sensitive_model_is_patched_before_vpk_packaging(self):
         extractor = self.extractor_path()
         if not extractor.is_file():
@@ -4823,6 +4964,112 @@ class DeploymentTests(unittest.TestCase):
             self.assertFalse(any(output.glob("pak*_dir.vpk")))
             self.assertFalse(any(output.glob("*.rollback")))
 
+    def test_first_deploy_rolls_back_hero_demo_overlay_when_marker_write_fails(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            cache = root / "cache"
+            output = dota / "game/dota_dutch"
+            source = cache / "models/heroes/test/default.vmdl_c"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"compiled model")
+            hero_demo = dota / "game/dota_addons/hero_demo/resource"
+            hero_demo.mkdir(parents=True)
+            (hero_demo / "addon_english.txt").write_bytes(b"English Hero Demo")
+            addon_target = (
+                dota
+                / "game/dota_dutch_addons/hero_demo/resource/addon_dutch.txt"
+            )
+
+            with patch(
+                "dota_disabler.deployment.write_json",
+                side_effect=OSError("marker disk failure"),
+            ):
+                with self.assertRaisesRegex(OSError, "marker disk failure"):
+                    generator.deploy_overrides(
+                        self.make_plan(),
+                        cache,
+                        output,
+                        root / "work",
+                        extractor=extractor,
+                        dota_root=dota,
+                        clean_first=True,
+                        allow_missing=False,
+                        language="dutch",
+                    )
+
+            self.assertFalse(addon_target.exists())
+            self.assertFalse((output / generator.MARKER_FILENAME).exists())
+            self.assertFalse(any((dota / "game").rglob("*.rollback")))
+
+    def test_rebuild_restores_previous_hero_demo_overlay_when_marker_write_fails(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            cache = root / "cache"
+            output = dota / "game/dota_dutch"
+            source = cache / "models/heroes/test/default.vmdl_c"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"compiled model")
+            hero_demo = dota / "game/dota_addons/hero_demo/resource"
+            hero_demo.mkdir(parents=True)
+            (hero_demo / "addon_english.txt").write_bytes(b"English Hero Demo")
+            (hero_demo / "addon_french.txt").write_bytes(b"French Hero Demo")
+
+            generator.deploy_overrides(
+                self.make_plan(),
+                cache,
+                output,
+                root / "work",
+                extractor=extractor,
+                dota_root=dota,
+                clean_first=True,
+                allow_missing=False,
+                language="dutch",
+                interface_language="english",
+                progress=lambda _message: None,
+            )
+            marker_path = output / generator.MARKER_FILENAME
+            previous_marker = marker_path.read_bytes()
+            previous = generator.read_marker(output, allow_shared_directory=True)
+            archive = output / previous["files"][0]
+            previous_archive = archive.read_bytes()
+            addon = (
+                dota
+                / "game/dota_dutch_addons/hero_demo/resource/addon_dutch.txt"
+            )
+            self.assertEqual(addon.read_bytes(), b"English Hero Demo")
+
+            with patch(
+                "dota_disabler.deployment.write_json",
+                side_effect=OSError("marker disk failure"),
+            ):
+                with self.assertRaisesRegex(OSError, "marker disk failure"):
+                    generator.deploy_overrides(
+                        self.make_plan(),
+                        cache,
+                        output,
+                        root / "work",
+                        extractor=extractor,
+                        dota_root=dota,
+                        clean_first=True,
+                        allow_missing=False,
+                        language="dutch",
+                        interface_language="french",
+                        progress=lambda _message: None,
+                    )
+
+            self.assertEqual(marker_path.read_bytes(), previous_marker)
+            self.assertEqual(archive.read_bytes(), previous_archive)
+            self.assertEqual(addon.read_bytes(), b"English Hero Demo")
+            self.assertFalse(any((dota / "game").rglob("*.rollback")))
+
     def test_rebuild_restores_previous_archive_when_marker_write_fails(self):
         extractor = self.extractor_path()
         if not extractor.is_file():
@@ -5222,6 +5469,76 @@ class DeploymentTests(unittest.TestCase):
                 generator.clean_output(output, allow_shared_directory=True)
             self.assertEqual(archive.read_bytes(), b"owned archive fixture")
 
+    def test_clean_refuses_to_remove_a_modified_addon_language_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary) / "game"
+            output = game / "dota_dutch"
+            output.mkdir(parents=True)
+            archive = output / generator.VPK_ARCHIVE_CANDIDATES[0]
+            archive.write_bytes(b"owned archive fixture")
+            relative = generator.addon_language_support_relative("dutch")
+            addon = game.joinpath(*relative.split("/"))
+            addon.parent.mkdir(parents=True)
+            addon.write_bytes(b"original generated catalog")
+            original_checksum = generator.sha256_file(addon)
+            generator.write_json(
+                output / generator.MARKER_FILENAME,
+                {
+                    "kind": generator.MARKER_KIND,
+                    "deployment_mode": generator.VPK_DEPLOYMENT_MODE,
+                    "language": "dutch",
+                    "interface_language": "english",
+                    "files": [archive.name],
+                    "resources": [],
+                    "archive_sha256": generator.sha256_file(archive),
+                    "addon_support_files": [
+                        {"path": relative, "sha256": original_checksum}
+                    ],
+                },
+            )
+            addon.write_bytes(b"user-modified catalog")
+
+            with self.assertRaisesRegex(
+                generator.UnsafeOutputError,
+                "modified add-on language file",
+            ):
+                generator.clean_output(output, allow_shared_directory=True)
+
+            self.assertTrue(archive.is_file())
+            self.assertEqual(addon.read_bytes(), b"user-modified catalog")
+            self.assertTrue((output / generator.MARKER_FILENAME).is_file())
+
+    def test_addon_marker_language_must_match_its_output_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            game = Path(temporary) / "game"
+            output = game / "dota_french"
+            output.mkdir(parents=True)
+            archive = output / generator.VPK_ARCHIVE_CANDIDATES[0]
+            archive.write_bytes(b"owned archive fixture")
+            relative = generator.addon_language_support_relative("dutch")
+            generator.write_json(
+                output / generator.MARKER_FILENAME,
+                {
+                    "kind": generator.MARKER_KIND,
+                    "deployment_mode": generator.VPK_DEPLOYMENT_MODE,
+                    "language": "dutch",
+                    "files": [archive.name],
+                    "resources": [],
+                    "archive_sha256": generator.sha256_file(archive),
+                    "addon_support_files": [
+                        {"path": relative, "sha256": "0" * 64}
+                    ],
+                },
+            )
+
+            with self.assertRaisesRegex(
+                generator.UnsafeOutputError,
+                "does not match the owned output root",
+            ):
+                generator.clean_output(output, allow_shared_directory=True)
+
+            self.assertTrue(archive.is_file())
+
     def test_migration_removes_only_owned_legacy_loose_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             dota = Path(temporary) / "dota 2 beta"
@@ -5462,6 +5779,103 @@ class VpkExtractorIntegrationTests(unittest.TestCase):
                 (staged / "resource/localization/dota_finnish.txt").read_bytes(),
                 b"english UI",
             )
+
+    def test_selected_interface_language_replaces_english_with_per_file_fallback(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the integration test")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            vpk = root / "pak01_dir.vpk"
+            self.write_test_vpk_entries(
+                vpk,
+                {
+                    "resource/localization/dota_english.txt": b"english Dota UI",
+                    "resource/localization/dota_french.txt": b"French Dota UI",
+                    "resource/localization/gameui_english.txt": b"English fallback UI",
+                },
+            )
+
+            staged = root / "staged"
+            support = generator.stage_language_support(
+                extractor,
+                vpk,
+                root / "work",
+                staged,
+                "dutch",
+                "french",
+            )
+
+            self.assertEqual(
+                support,
+                [
+                    "resource/localization/dota_dutch.txt",
+                    "resource/localization/gameui_dutch.txt",
+                ],
+            )
+            self.assertEqual(
+                (staged / "resource/localization/dota_dutch.txt").read_bytes(),
+                b"French Dota UI",
+            )
+            self.assertEqual(
+                (staged / "resource/localization/gameui_dutch.txt").read_bytes(),
+                b"English fallback UI",
+            )
+
+    def test_loose_core_and_hero_demo_catalogs_preserve_selected_language(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            core = dota / "game/core"
+            valve = core / "resource/valve_english.txt"
+            valve.parent.mkdir(parents=True)
+            valve.write_bytes(b"English camera labels")
+            valve.with_name("valve_french.txt").write_bytes(b"French camera labels")
+            panorama = core / "panorama/localization/panorama_english.txt"
+            panorama.parent.mkdir(parents=True)
+            panorama.write_bytes(b"English Panorama fallback")
+            hero_demo = dota / "game/dota_addons/hero_demo/resource"
+            hero_demo.mkdir(parents=True)
+            (hero_demo / "addon_english.txt").write_bytes(b"English Hero Demo")
+            (hero_demo / "addon_french.txt").write_bytes(b"French Hero Demo")
+
+            staging = root / "staging"
+            core_support = generator.stage_core_language_support(
+                dota,
+                staging,
+                "dutch",
+                "french",
+            )
+            addon_jobs = generator.stage_hero_demo_language_support(
+                dota,
+                root / "work",
+                "dutch",
+                "french",
+            )
+
+            self.assertEqual(
+                core_support,
+                [
+                    "panorama/localization/panorama_dutch.txt",
+                    "resource/valve_dutch.txt",
+                ],
+            )
+            self.assertEqual(
+                (staging / "resource/valve_dutch.txt").read_bytes(),
+                b"French camera labels",
+            )
+            self.assertEqual(
+                (staging / "panorama/localization/panorama_dutch.txt").read_bytes(),
+                b"English Panorama fallback",
+            )
+            self.assertEqual(len(addon_jobs), 1)
+            relative, staged_addon = addon_jobs[0]
+            self.assertEqual(
+                relative,
+                "dota_dutch_addons/hero_demo/resource/addon_dutch.txt",
+            )
+            self.assertEqual(staged_addon.read_bytes(), b"French Hero Demo")
 
     def test_python_extraction_does_not_reuse_a_stale_missing_resource(self):
         extractor = self.extractor_path()

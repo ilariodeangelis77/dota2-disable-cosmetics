@@ -270,13 +270,17 @@ def status_presentation(
         "current": (
             translate("CURRENT"),
             GREEN,
-            translate("Installed Dota build matches the build used for these overrides"),
+            translate(
+                "Installed Dota build and Steam language match these overrides"
+            ),
             translate("Rebuild Overrides"),
         ),
         "stale": (
             translate("UPDATE FOUND"),
             AMBER,
-            translate("Installed Dota build changed since the last build"),
+            translate(
+                "Installed Dota build or Steam language changed since the last build"
+            ),
             translate("Rebuild for Installed Build"),
         ),
         "legacy": (
@@ -288,7 +292,7 @@ def status_presentation(
         "broken": (
             translate("REPAIR REQUIRED"),
             RED,
-            translate("The owned VPK is missing or failed its checksum check"),
+            translate("An owned override file is missing or failed its checksum check"),
             translate("Repair Overrides"),
         ),
         "not_built": (

@@ -1147,7 +1147,7 @@ class DisablerApp:
         self._append_log(
             self._tr(
                 "Compatibility mount changed to {language}. "
-                "Dota's interface will remain English after building."
+                "Dota's interface will keep the language selected in Steam after building."
             ).format(language=language)
         )
         if self.path_var.get().strip():

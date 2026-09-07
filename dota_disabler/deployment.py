@@ -46,10 +46,70 @@ from .version import VERSION
 from .versioning import (
     capture_dota_version,
     compare_dota_versions,
+    dota_interface_language,
     dota_operation_lock,
     find_dota_install,
+    normalize_dota_interface_language,
 )
-from .vpk import pack_vpk, stage_english_language_support
+from .vpk import (
+    pack_vpk,
+    stage_core_language_support,
+    stage_hero_demo_language_support,
+    stage_language_support,
+)
+
+
+_HERO_DEMO_ADDON = "hero_demo"
+
+
+def addon_language_support_relative(language: str) -> str:
+    return (
+        f"dota_{language}_addons/{_HERO_DEMO_ADDON}/resource/"
+        f"addon_{language}.txt"
+    )
+
+
+def marker_addon_support_files(marker: dict, output_root: Path) -> list[dict[str, str]]:
+    entries = marker.get("addon_support_files", [])
+    if not isinstance(entries, list):
+        raise UnsafeOutputError(
+            f"Invalid add-on language-support list in marker: {output_root / MARKER_FILENAME}"
+        )
+    language = marker.get("language")
+    if entries and (
+        not isinstance(language, str) or language not in RECOGNIZED_LANGUAGES
+    ):
+        raise UnsafeOutputError(
+            f"Invalid add-on language in marker: {output_root / MARKER_FILENAME}"
+        )
+    if entries and output_root.name.casefold() != f"dota_{language}".casefold():
+        raise UnsafeOutputError(
+            f"Add-on language does not match the owned output root: {output_root / MARKER_FILENAME}"
+        )
+    expected = addon_language_support_relative(language) if entries else None
+    validated: list[dict[str, str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise UnsafeOutputError(
+                f"Invalid add-on language-support entry in marker: {output_root / MARKER_FILENAME}"
+            )
+        relative = entry.get("path")
+        checksum = entry.get("sha256")
+        if (
+            relative != expected
+            or not isinstance(checksum, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", checksum)
+        ):
+            raise UnsafeOutputError(
+                f"Invalid add-on language-support entry in marker: {output_root / MARKER_FILENAME}"
+            )
+        path_under(output_root.parent, relative)
+        validated.append({"path": relative, "sha256": checksum})
+    if len(validated) > 1:
+        raise UnsafeOutputError(
+            f"Invalid add-on language-support list in marker: {output_root / MARKER_FILENAME}"
+        )
+    return validated
 
 
 def read_marker(output_root: Path, *, allow_shared_directory: bool = False) -> Optional[dict]:
@@ -114,6 +174,7 @@ def read_marker(output_root: Path, *, allow_shared_directory: bool = False) -> O
             r"[0-9a-f]{64}", archive_sha256
         ):
             raise UnsafeOutputError(f"Invalid VPK checksum in marker: {marker_path}")
+        marker_addon_support_files(marker, output_root)
     else:
         for relative in files:
             try:
@@ -211,6 +272,24 @@ def remove_tracked_files(output_root: Path, files: Iterable[str]) -> None:
             pass
 
 
+def _prune_empty_parents(target: Path, root: Path) -> None:
+    parent = target.parent
+    while parent != root and root in parent.parents:
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+        parent = parent.parent
+
+
+def addon_language_support_valid(marker: dict, output_root: Path) -> bool:
+    for entry in marker_addon_support_files(marker, output_root):
+        target = path_under(output_root.parent, entry["path"])
+        if not target.is_file() or sha256_file(target) != entry["sha256"]:
+            return False
+    return True
+
+
 def deploy_overrides(
     plan: Plan,
     cache: Path,
@@ -220,10 +299,12 @@ def deploy_overrides(
     extractor: Path,
     model_patcher: Optional[Path] = None,
     game_pak: Optional[Path] = None,
+    dota_root: Optional[Path] = None,
     items_schema: Optional[Path] = None,
     clean_first: bool,
     allow_missing: bool,
     language: str,
+    interface_language: str = "english",
     dota_version: Optional[dict] = None,
     generated_at_utc: Optional[str] = None,
     enabled_categories: Optional[Iterable[str]] = None,
@@ -233,6 +314,7 @@ def deploy_overrides(
     # ``items_schema`` remains in the API for compatibility with pre-0.7 callers;
     # current Dota ignores a recognized-language economy-schema overlay.
     del items_schema
+    interface_language = normalize_dota_interface_language(interface_language)
     selected_categories = (
         set(enabled_categories)
         if enabled_categories is not None
@@ -830,9 +912,9 @@ def deploy_overrides(
     def language_progress(operation: str, completed: int, total: int) -> None:
         phase = "language_stage" if operation == "stage" else "language_extract"
         label = (
-            "Staging English interface resources"
+            f"Staging {interface_language} interface resources"
             if operation == "stage"
-            else "Extracting English interface resources"
+            else f"Extracting {interface_language} interface resources"
         )
         deployment_progress.work(
             phase,
@@ -841,22 +923,51 @@ def deploy_overrides(
             f"{label} ({completed:,} of {total:,})",
         )
 
-    deployment_progress.begin("language_extract", "Adding English interface resources")
-    support_resources = (
-        stage_english_language_support(
+    deployment_progress.begin(
+        "language_extract",
+        f"Adding {interface_language} interface resources",
+    )
+    vpk_support_resources = (
+        stage_language_support(
             extractor,
             game_pak,
             work,
             staging,
             language,
+            interface_language,
             progress=progress,
             progress_update=language_progress,
         )
         if game_pak is not None
         else []
     )
+    core_support_resources = (
+        stage_core_language_support(
+            dota_root,
+            staging,
+            language,
+            interface_language,
+            progress=progress,
+        )
+        if dota_root is not None
+        else []
+    )
+    addon_support_jobs = (
+        stage_hero_demo_language_support(
+            dota_root,
+            work,
+            language,
+            interface_language,
+            progress=progress,
+        )
+        if dota_root is not None
+        else []
+    )
+    support_resources = sorted(
+        set(vpk_support_resources) | set(core_support_resources)
+    )
     deployment_progress.complete(
-        "language_extract", "English interface resources extracted"
+        "language_extract", f"{interface_language} interface resources extracted"
     )
     deployment_progress.complete(
         "language_stage", "Language compatibility resources ready"
@@ -871,6 +982,13 @@ def deploy_overrides(
     validate_category_transition(existing, selected_categories, clean_first=clean_first)
     old_files = list(existing["files"]) if existing else []
     old_file_set = set(old_files)
+    old_addon_entries = (
+        marker_addon_support_files(existing, output_root) if existing else []
+    )
+    old_addon_by_path = {entry["path"]: entry for entry in old_addon_entries}
+    new_addon_by_path = {
+        relative: staged_source for relative, staged_source in addon_support_jobs
+    }
     archive_name = choose_vpk_archive_name(output_root, existing)
     archive_destination = path_under(output_root, archive_name)
     if archive_destination.exists() and not archive_destination.is_file():
@@ -880,6 +998,34 @@ def deploy_overrides(
     if archive_destination.is_file() and archive_name not in old_file_set:
         raise UnsafeOutputError(
             f"Refusing to overwrite a VPK that is not owned by this tool: {archive_destination}"
+        )
+
+    addon_transactions: list[tuple[str, Path, Optional[Path], Path, Path]] = []
+    for relative in sorted(set(old_addon_by_path) | set(new_addon_by_path)):
+        target = path_under(output_root.parent, relative)
+        if target.exists() and not target.is_file():
+            raise UnsafeOutputError(
+                f"Expected an add-on language file but found another file type: {target}"
+            )
+        old_entry = old_addon_by_path.get(relative)
+        if target.is_file():
+            if old_entry is None:
+                raise UnsafeOutputError(
+                    f"Refusing to overwrite an add-on language file not owned by this tool: {target}"
+                )
+            if sha256_file(target) != old_entry["sha256"]:
+                raise UnsafeOutputError(
+                    f"Refusing to overwrite a modified add-on language file: {target}"
+                )
+        staged_source = new_addon_by_path.get(relative)
+        temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
+        rollback = target.with_name(f".{target.name}.{os.getpid()}.rollback")
+        if temporary.exists() or rollback.exists():
+            raise UnsafeOutputError(
+                f"Refusing deployment because an add-on transaction file already exists near: {target}"
+            )
+        addon_transactions.append(
+            (relative, target, staged_source, temporary, rollback)
         )
 
     package_root = work / "package" / language
@@ -942,12 +1088,23 @@ def deploy_overrides(
             obsolete_rollbacks.append((target, rollback))
     deployment_progress.begin("install", "Installing the validated override VPK")
     committed = False
+    secured_addons: set[Path] = set()
+    installed_addons: set[Path] = set()
     try:
         if archive_destination.is_file():
             os.replace(archive_destination, rollback_destination)
         deployment_progress.work("install", 1, 6, "Securing the previous owned VPK")
         for target, rollback in obsolete_rollbacks:
             os.replace(target, rollback)
+        for _relative, target, staged_source, temporary, rollback in addon_transactions:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_file():
+                os.replace(target, rollback)
+                secured_addons.add(target)
+            if staged_source is not None:
+                shutil.copy2(staged_source, temporary)
+                os.replace(temporary, target)
+                installed_addons.add(target)
         deployment_progress.work("install", 2, 6, "Securing obsolete owned files")
         shutil.copy2(staged_archive, temporary_destination)
         deployment_progress.work("install", 3, 6, "Copying the validated override VPK")
@@ -961,6 +1118,7 @@ def deploy_overrides(
                 "generator_version": VERSION,
                 "deployment_mode": VPK_DEPLOYMENT_MODE,
                 "language": language,
+                "interface_language": interface_language,
                 "generated_at_utc": generated_at_utc
                 or datetime.now(timezone.utc).isoformat(),
                 "dota_version": dota_version,
@@ -968,6 +1126,15 @@ def deploy_overrides(
                 "files": [archive_name],
                 "resources": unique_resources,
                 "support_resources": support_resources,
+                "addon_support_files": [
+                    {
+                        "path": relative,
+                        "sha256": sha256_file(target),
+                    }
+                    for relative, target, staged_source, _temporary, _rollback
+                    in addon_transactions
+                    if staged_source is not None
+                ],
                 "schema_resources": schema_resources,
                 "archive_sha256": sha256_file(archive_destination),
             },
@@ -986,6 +1153,15 @@ def deploy_overrides(
                 if target.exists():
                     raise OSError(f"Cannot restore owned file over existing path: {target}")
                 os.replace(rollback, target)
+            for _relative, target, _staged_source, temporary, rollback in addon_transactions:
+                if temporary.is_file():
+                    temporary.unlink()
+                if target in installed_addons and target.is_file():
+                    target.unlink()
+                if target in secured_addons and rollback.is_file():
+                    os.replace(rollback, target)
+                elif target not in secured_addons and not target.exists():
+                    _prune_empty_parents(target, output_root.parent)
         except OSError as rollback_error:
             raise UnsafeOutputError(
                 "Deployment failed and the previous owned output could not be restored safely. "
@@ -995,6 +1171,9 @@ def deploy_overrides(
     finally:
         if temporary_destination.is_file():
             temporary_destination.unlink()
+        for _relative, _target, _staged_source, temporary, _rollback in addon_transactions:
+            if temporary.is_file():
+                temporary.unlink()
         if committed and rollback_destination.is_file():
             try:
                 rollback_destination.unlink()
@@ -1014,6 +1193,19 @@ def deploy_overrides(
                         "WARNING: The new marker and VPK were committed, but a temporary "
                         f"legacy rollback file could not be removed: {exc}"
                     )
+            for _relative, _target, _staged_source, _temporary, rollback in addon_transactions:
+                if not rollback.is_file():
+                    continue
+                try:
+                    rollback.unlink()
+                except OSError as exc:
+                    progress(
+                        "WARNING: The new marker and VPK were committed, but an add-on "
+                        f"rollback file could not be removed: {exc}"
+                    )
+            for _relative, target, staged_source, _temporary, _rollback in addon_transactions:
+                if staged_source is None:
+                    _prune_empty_parents(target, output_root.parent)
             try:
                 remove_tracked_files(output_root, obsolete_owned_files)
             except (OSError, UnsafeOutputError) as exc:
@@ -1041,14 +1233,31 @@ def clean_output(
         progress(f"Nothing generated by this tool was found under: {output_root}")
         return 0
     files = marker["files"]
+    addon_entries = marker_addon_support_files(marker, output_root)
+    for entry in addon_entries:
+        target = path_under(output_root.parent, entry["path"])
+        if target.exists() and not target.is_file():
+            raise UnsafeOutputError(
+                f"Expected an owned add-on language file but found another file type: {target}"
+            )
+        if target.is_file() and sha256_file(target) != entry["sha256"]:
+            raise UnsafeOutputError(
+                f"Refusing to remove a modified add-on language file: {target}"
+            )
     remove_tracked_files(output_root, files)
+    for entry in addon_entries:
+        target = path_under(output_root.parent, entry["path"])
+        if target.is_file():
+            target.unlink()
+        _prune_empty_parents(target, output_root.parent)
     (output_root / MARKER_FILENAME).unlink()
     try:
         output_root.rmdir()
     except OSError:
         pass
-    progress(f"Removed {len(files)} generated override file(s) from: {output_root}")
-    return len(files)
+    removed = len(files) + len(addon_entries)
+    progress(f"Removed {removed} generated override file(s) from: {output_root}")
+    return removed
 
 
 def validate_language(language: str, *, allow_legacy: bool = False) -> str:
@@ -1147,6 +1356,7 @@ def get_status(dota_path: Optional[str], language_name: str = DEFAULT_LANGUAGE) 
     language = validate_language(language_name, allow_legacy=True)
     output_root = dota / "game" / f"dota_{language}"
     current_version = capture_dota_version(dota)
+    current_interface_language = dota_interface_language(current_version)
     marker = read_marker(
         output_root,
         allow_shared_directory=language != LEGACY_LANGUAGE,
@@ -1171,6 +1381,9 @@ def get_status(dota_path: Optional[str], language_name: str = DEFAULT_LANGUAGE) 
                 "enabled_categories": legacy_marker.get("enabled_categories"),
                 "deployment_mode": "legacy-loose-files",
                 "archive_valid": False,
+                "current_interface_language": current_interface_language,
+                "recorded_interface_language": legacy_marker.get("interface_language"),
+                "language_support_valid": None,
             }
         result = {
             "status": "not_built",
@@ -1185,6 +1398,9 @@ def get_status(dota_path: Optional[str], language_name: str = DEFAULT_LANGUAGE) 
             "enabled_categories": None,
             "deployment_mode": None,
             "archive_valid": None,
+            "current_interface_language": current_interface_language,
+            "recorded_interface_language": None,
+            "language_support_valid": None,
         }
     else:
         recorded_version = marker.get("dota_version")
@@ -1196,13 +1412,23 @@ def get_status(dota_path: Optional[str], language_name: str = DEFAULT_LANGUAGE) 
                 archive_path.is_file()
                 and sha256_file(archive_path) == marker["archive_sha256"]
             )
-        status = (
-            "broken"
-            if archive_valid is False
-            else {"same": "current", "different": "stale", "unknown": "unknown"}[
+        language_support_valid: Optional[bool] = None
+        recorded_interface_language = marker.get("interface_language")
+        interface_language_changed = False
+        if marker.get("deployment_mode") == VPK_DEPLOYMENT_MODE:
+            language_support_valid = addon_language_support_valid(marker, output_root)
+            interface_language_changed = (
+                recorded_interface_language != current_interface_language
+            )
+        if archive_valid is False or language_support_valid is False:
+            status = "broken"
+        elif interface_language_changed:
+            status = "stale"
+            basis = "Steam Dota language"
+        else:
+            status = {"same": "current", "different": "stale", "unknown": "unknown"}[
                 comparison
             ]
-        )
         result = {
             "status": status,
             "language": language,
@@ -1216,11 +1442,16 @@ def get_status(dota_path: Optional[str], language_name: str = DEFAULT_LANGUAGE) 
             "enabled_categories": marker.get("enabled_categories"),
             "deployment_mode": marker.get("deployment_mode", "legacy-loose-files"),
             "archive_valid": archive_valid,
+            "current_interface_language": current_interface_language,
+            "recorded_interface_language": recorded_interface_language,
+            "language_support_valid": language_support_valid,
         }
     return result
 
 
 __all__ = [
+    "addon_language_support_relative",
+    "addon_language_support_valid",
     "choose_vpk_archive_name",
     "clean_cosmetics",
     "clean_legacy_output_after_migration",
@@ -1229,6 +1460,7 @@ __all__ = [
     "deploy_overrides",
     "get_status",
     "marker_enabled_categories",
+    "marker_addon_support_files",
     "read_marker",
     "remove_tracked_files",
     "sha256_file",

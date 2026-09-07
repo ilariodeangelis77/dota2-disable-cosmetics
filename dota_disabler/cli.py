@@ -69,6 +69,10 @@ def do_status(args: argparse.Namespace) -> int:
 
     print(f"Dota: {dota}")
     print(f"Current Dota version: {dota_version_label(current_version)}")
+    print(
+        "Dota interface language: "
+        f"{result.get('current_interface_language', 'english')}"
+    )
     if result["status"] == "not_built":
         print(f"Status: NOT BUILT - no disabler marker was found under {output_root}")
     elif result["status"] == "legacy":
@@ -83,17 +87,19 @@ def do_status(args: argparse.Namespace) -> int:
         print(f"Generated at: {result['generated_at_utc'] or 'unknown'}")
         if result["status"] == "current":
             print(
-                f"Status: CURRENT - the versions match ({result['comparison_basis']})."
+                "Status: CURRENT - the Dota build and Steam language match "
+                f"({result['comparison_basis']})."
             )
         elif result["status"] == "stale":
             print(
-                f"Status: STALE - Dota changed ({result['comparison_basis']}). "
+                "Status: STALE - the Dota build or Steam language changed "
+                f"({result['comparison_basis']}). "
                 "Run build again."
             )
         elif result["status"] == "broken":
             print(
-                "Status: BROKEN - the owned VPK is missing or does not match its recorded "
-                "checksum. Run build again."
+                "Status: BROKEN - an owned override file is missing or does not match "
+                "its recorded checksum. Run build again."
             )
         else:
             print(

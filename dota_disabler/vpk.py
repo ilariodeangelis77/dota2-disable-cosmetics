@@ -299,6 +299,87 @@ def list_vpk_resources(extractor: Path, pak: Path, suffixes: Iterable[str]) -> l
     return [canonical(path) for path in resources]
 
 
+def _localized_resource_target(path: str, source_language: str, target_language: str) -> str:
+    for extension in ("txt", "vtt"):
+        suffix = f"_{source_language}.{extension}"
+        if path.endswith(suffix):
+            return path[: -len(suffix)] + f"_{target_language}.{extension}"
+    raise ValueError(f"Resource does not use the expected language suffix: {path!r}")
+
+
+def stage_language_support(
+    extractor: Path,
+    pak: Path,
+    work: Path,
+    staging: Path,
+    language: str,
+    interface_language: str,
+    *,
+    progress: ProgressCallback = print,
+    progress_update: Optional[WorkProgressCallback] = None,
+) -> list[str]:
+    source_languages = ["english"]
+    if interface_language != "english":
+        source_languages.append(interface_language)
+    listed_resources = list_vpk_resources(
+        extractor,
+        pak,
+        tuple(
+            f"_{source_language}.{extension}"
+            for source_language in source_languages
+            for extension in ("txt", "vtt")
+        ),
+    )
+    resources_by_target: dict[str, str] = {}
+    for source_language in source_languages:
+        suffixes = (f"_{source_language}.txt", f"_{source_language}.vtt")
+        for source_relative in listed_resources:
+            if not source_relative.endswith(suffixes):
+                continue
+            target_relative = _localized_resource_target(
+                source_relative,
+                source_language,
+                language,
+            )
+            resources_by_target[target_relative] = source_relative
+    if not resources_by_target:
+        progress(
+            "NOTE: No localization resources were found for the language compatibility layer."
+        )
+        return []
+    selected_sources = sorted(set(resources_by_target.values()))
+    source_root_path = work / "language-support" / interface_language
+    extract_vpk(
+        extractor,
+        pak,
+        selected_sources,
+        source_root_path,
+        progress=progress,
+        progress_update=progress_update,
+    )
+    staged: list[str] = []
+    for index, (target_relative, source_relative) in enumerate(
+        sorted(resources_by_target.items()),
+        start=1,
+    ):
+        source = path_under(source_root_path, source_relative)
+        if not source.is_file():
+            raise GeneratorError(
+                f"Interface language resource was not extracted: {source_relative}"
+            )
+        destination = path_under(staging, target_relative)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        staged.append(target_relative)
+        if progress_update is not None:
+            progress_update("stage", index, len(resources_by_target))
+    progress(
+        f"Added {len(staged)} {interface_language}-interface compatibility resource(s) "
+        f"for -language {language}."
+    )
+    return sorted(staged)
+
+
 def stage_english_language_support(
     extractor: Path,
     pak: Path,
@@ -309,44 +390,93 @@ def stage_english_language_support(
     progress: ProgressCallback = print,
     progress_update: Optional[WorkProgressCallback] = None,
 ) -> list[str]:
-    english_resources = list_vpk_resources(extractor, pak, ("_english.txt", "_english.vtt"))
-    if not english_resources:
-        progress(
-            "NOTE: No English localization resources were found for the language compatibility layer."
-        )
-        return []
-    source_root_path = work / "language-support" / "english"
-    extract_vpk(
+    """Compatibility wrapper for integrations that explicitly request English."""
+
+    return stage_language_support(
         extractor,
         pak,
-        english_resources,
-        source_root_path,
+        work,
+        staging,
+        language,
+        "english",
         progress=progress,
         progress_update=progress_update,
     )
-    staged: list[str] = []
-    for index, source_relative in enumerate(english_resources, start=1):
-        if source_relative.endswith("_english.txt"):
-            target_relative = source_relative[: -len("_english.txt")] + f"_{language}.txt"
-        elif source_relative.endswith("_english.vtt"):
-            target_relative = source_relative[: -len("_english.vtt")] + f"_{language}.vtt"
-        else:
+
+
+def stage_core_language_support(
+    dota: Path,
+    staging: Path,
+    language: str,
+    interface_language: str,
+    *,
+    progress: ProgressCallback = print,
+) -> list[str]:
+    """Stage loose Source 2 core catalogs into the normal language VPK."""
+
+    core = dota / "game/core"
+    resources_by_target: dict[str, Path] = {}
+    for relative_root in ("panorama/localization", "resource"):
+        source_root_path = path_under(core, relative_root)
+        if not source_root_path.is_dir():
             continue
-        source = path_under(source_root_path, source_relative)
-        if not source.is_file():
-            raise GeneratorError(
-                f"English language resource was not extracted: {source_relative}"
+        for english_source in source_root_path.rglob("*_english.txt"):
+            english_relative = canonical(english_source.relative_to(core).as_posix())
+            target_relative = _localized_resource_target(
+                english_relative,
+                "english",
+                language,
             )
+            selected_source = english_source
+            if interface_language != "english":
+                localized_name = (
+                    english_source.name[: -len("_english.txt")]
+                    + f"_{interface_language}.txt"
+                )
+                localized_source = english_source.with_name(localized_name)
+                if localized_source.is_file():
+                    selected_source = localized_source
+            resources_by_target[target_relative] = selected_source
+    for target_relative, source in sorted(resources_by_target.items()):
         destination = path_under(staging, target_relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
-        staged.append(target_relative)
-        if progress_update is not None:
-            progress_update("stage", index, len(english_resources))
+    if resources_by_target:
+        progress(
+            f"Added {len(resources_by_target)} loose core localization resource(s) "
+            f"for the {interface_language} interface."
+        )
+    return sorted(resources_by_target)
+
+
+def stage_hero_demo_language_support(
+    dota: Path,
+    work: Path,
+    language: str,
+    interface_language: str,
+    *,
+    progress: ProgressCallback = print,
+) -> list[tuple[str, Path]]:
+    """Stage Hero Demo's catalog for Dota's separate add-on language root."""
+
+    resource_root = dota / "game/dota_addons/hero_demo/resource"
+    localized_source = resource_root / f"addon_{interface_language}.txt"
+    english_source = resource_root / "addon_english.txt"
+    source = localized_source if localized_source.is_file() else english_source
+    if not source.is_file():
+        progress("NOTE: Hero Demo localization was not found; no add-on overlay was staged.")
+        return []
+    relative = f"dota_{language}_addons/hero_demo/resource/addon_{language}.txt"
+    stage_root = work / "addon-language-support" / language
+    if stage_root.exists():
+        shutil.rmtree(stage_root)
+    destination = path_under(stage_root, relative)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
     progress(
-        f"Added {len(staged)} English-language compatibility resource(s) for -language {language}."
+        f"Staged Hero Demo localization for the {interface_language} interface."
     )
-    return sorted(staged)
+    return [(relative, destination)]
 
 
 __all__ = [
@@ -355,6 +485,9 @@ __all__ = [
     "list_vpk_resources",
     "pack_vpk",
     "run",
+    "stage_core_language_support",
     "stage_english_language_support",
+    "stage_hero_demo_language_support",
+    "stage_language_support",
     "validate_vpk_extractor",
 ]

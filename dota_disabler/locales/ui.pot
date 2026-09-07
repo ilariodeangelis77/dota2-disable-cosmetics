@@ -7,10 +7,10 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dota 2 Cosmetic Disabler 0.9.1\n"
+"Project-Id-Version: Dota 2 Cosmetic Disabler 0.9.2\n"
 "Report-Msgid-Bugs-To: https://github.com/ilariodeangelis77/dota2-disable-"
 "cosmetics/issues\n"
-"POT-Creation-Date: 2026-09-04 21:53+0200\n"
+"POT-Creation-Date: 2026-09-07 19:03+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -24,292 +24,292 @@ msgstr ""
 msgid "System default ({language})"
 msgstr ""
 
-#: dota_disabler/gui.py:500
+#: dota_disabler/gui.py:505
 msgid "COSMETIC DISABLER"
 msgstr ""
 
-#: dota_disabler/gui.py:510
+#: dota_disabler/gui.py:521
 #, python-brace-format
 msgid "Local model & effect overrides  ·  v{version}  ·  no injection"
 msgstr ""
 
-#: dota_disabler/gui.py:526
+#: dota_disabler/gui.py:537
 msgid "DETECTING"
 msgstr ""
 
-#: dota_disabler/gui.py:538
+#: dota_disabler/gui.py:549
 msgid "Refresh"
 msgstr ""
 
-#: dota_disabler/gui.py:556
+#: dota_disabler/gui.py:566
 msgid "GUI language"
 msgstr ""
 
-#: dota_disabler/gui.py:590
+#: dota_disabler/gui.py:600
 msgid "DOTA 2 INSTALLATION & BUILD STATUS"
 msgstr ""
 
-#: dota_disabler/gui.py:622
+#: dota_disabler/gui.py:632
 msgid "Browse"
 msgstr ""
 
-#: dota_disabler/gui.py:630
+#: dota_disabler/gui.py:640
 msgid "Auto-detect"
 msgstr ""
 
-#: dota_disabler/gui.py:639
+#: dota_disabler/gui.py:649
 msgid "Waiting for detection"
 msgstr ""
 
-#: dota_disabler/gui.py:654
+#: dota_disabler/gui.py:664
 msgid "Dota compatibility mount"
 msgstr ""
 
-#: dota_disabler/gui.py:689
+#: dota_disabler/gui.py:699
 msgid "INSTALLED DOTA BUILD"
 msgstr ""
 
-#: dota_disabler/gui.py:716
+#: dota_disabler/gui.py:726
 msgid "OVERRIDES BUILT FROM"
 msgstr ""
 
-#: dota_disabler/gui.py:743
+#: dota_disabler/gui.py:753
 msgid "Looking for your Steam library…"
 msgstr ""
 
-#: dota_disabler/gui.py:765
+#: dota_disabler/gui.py:775
 msgid "COSMETICS TO DISABLE"
 msgstr ""
 
-#: dota_disabler/gui.py:775
+#: dota_disabler/gui.py:785
 msgid "Select all"
 msgstr ""
 
-#: dota_disabler/gui.py:783
+#: dota_disabler/gui.py:793
 msgid "Clear"
 msgstr ""
 
-#: dota_disabler/gui.py:861
+#: dota_disabler/gui.py:871
 msgid "Remove owned overrides"
 msgstr ""
 
-#: dota_disabler/gui.py:870 dota_disabler/gui.py:1107 dota_disabler/gui.py:1135
-#: dota_disabler/gui.py:1421 dota_disabler/gui.py:1464
-#: dota_disabler/gui_model.py:298
+#: dota_disabler/gui.py:880 dota_disabler/gui.py:1130 dota_disabler/gui.py:1158
+#: dota_disabler/gui.py:1444 dota_disabler/gui.py:1487
+#: dota_disabler/gui_model.py:302
 msgid "Build Overrides"
 msgstr ""
 
-#: dota_disabler/gui.py:893 dota_disabler/gui.py:1507
+#: dota_disabler/gui.py:903 dota_disabler/gui.py:1530
 msgid "Current activity"
 msgstr ""
 
-#: dota_disabler/gui.py:911
+#: dota_disabler/gui.py:927
 msgid "Report"
 msgstr ""
 
-#: dota_disabler/gui.py:919
+#: dota_disabler/gui.py:935
 msgid "Output"
 msgstr ""
 
-#: dota_disabler/gui.py:928
+#: dota_disabler/gui.py:950
 msgid "Copy launch option"
 msgstr ""
 
-#: dota_disabler/gui.py:967
+#: dota_disabler/gui.py:990
 msgid ""
 "Safety: unofficial overrides; test in Demo Hero first; no anti-cheat "
 "guarantee."
 msgstr ""
 
-#: dota_disabler/gui.py:971
+#: dota_disabler/gui.py:994
 msgid "Ready. Dota will be detected automatically."
 msgstr ""
 
-#: dota_disabler/gui.py:1062 dota_disabler/gui.py:1334
+#: dota_disabler/gui.py:1085 dota_disabler/gui.py:1357
 msgid "UI ERROR"
 msgstr ""
 
-#: dota_disabler/gui.py:1071
+#: dota_disabler/gui.py:1094
 #, python-brace-format
 msgid "{selected} of {total} category selected"
 msgid_plural "{selected} of {total} categories selected"
 msgstr[0] ""
 msgstr[1] ""
 
-#: dota_disabler/gui.py:1077
+#: dota_disabler/gui.py:1100
 #, python-brace-format
 msgid "{selection}  ·  {language} compatibility mount"
 msgstr ""
 
-#: dota_disabler/gui.py:1084
+#: dota_disabler/gui.py:1107
 msgid "Choose at least one cosmetic category before building"
 msgstr ""
 
-#: dota_disabler/gui.py:1093
+#: dota_disabler/gui.py:1116
 #, python-brace-format
 msgid "Selected {selected} of {total} replacement category."
 msgid_plural "Selected {selected} of {total} replacement categories."
 msgstr[0] ""
 msgstr[1] ""
 
-#: dota_disabler/gui.py:1113
+#: dota_disabler/gui.py:1136
 msgid "CHECKING MOUNT"
 msgstr ""
 
-#: dota_disabler/gui.py:1120
+#: dota_disabler/gui.py:1143
 #, python-brace-format
 msgid ""
 "Checking the {language} compatibility mount; rebuild to apply a new "
 "selection"
 msgstr ""
 
-#: dota_disabler/gui.py:1126
+#: dota_disabler/gui.py:1149
 #, python-brace-format
 msgid ""
-"Compatibility mount changed to {language}. Dota's interface will remain "
-"English after building."
+"Compatibility mount changed to {language}. Dota's interface will keep the"
+" language selected in Steam after building."
 msgstr ""
 
-#: dota_disabler/gui.py:1139
+#: dota_disabler/gui.py:1162
 msgid "CHECK PATH"
 msgstr ""
 
-#: dota_disabler/gui.py:1146
+#: dota_disabler/gui.py:1169
 msgid "Folder changed; refresh to validate it"
 msgstr ""
 
-#: dota_disabler/gui.py:1151
+#: dota_disabler/gui.py:1174
 msgid "Edited · press Enter or Refresh"
 msgstr ""
 
-#: dota_disabler/gui.py:1172
+#: dota_disabler/gui.py:1195
 #, python-brace-format
 msgid "Could not save UI settings: {error}"
 msgstr ""
 
-#: dota_disabler/gui.py:1188
+#: dota_disabler/gui.py:1211
 msgid "Detecting Dota 2 installation…"
 msgstr ""
 
-#: dota_disabler/gui.py:1202
+#: dota_disabler/gui.py:1225
 msgid "Searching Steam libraries…"
 msgstr ""
 
-#: dota_disabler/gui.py:1208
+#: dota_disabler/gui.py:1231
 msgid "Choose the 'dota 2 beta' folder"
 msgstr ""
 
-#: dota_disabler/gui.py:1216
+#: dota_disabler/gui.py:1239
 msgid "Selected manually"
 msgstr ""
 
-#: dota_disabler/gui.py:1230
+#: dota_disabler/gui.py:1253
 msgid "Checking installed Dota build and generated overrides…"
 msgstr ""
 
-#: dota_disabler/gui.py:1237
+#: dota_disabler/gui.py:1260
 msgid "Choose a category"
 msgstr ""
 
-#: dota_disabler/gui.py:1238
+#: dota_disabler/gui.py:1261
 msgid "Select at least one replacement category before building."
 msgstr ""
 
-#: dota_disabler/gui.py:1267
+#: dota_disabler/gui.py:1290
 msgid "Building model and effect overrides for the installed Dota build…"
 msgstr ""
 
-#: dota_disabler/gui.py:1273
+#: dota_disabler/gui.py:1296
 msgid "Remove generated overrides?"
 msgstr ""
 
-#: dota_disabler/gui.py:1275
+#: dota_disabler/gui.py:1298
 msgid ""
 "Only files listed in this tool's ownership marker will be removed. "
 "Untracked files are preserved. The Steam launch option is not changed."
 msgstr ""
 
-#: dota_disabler/gui.py:1297
+#: dota_disabler/gui.py:1320
 msgid "Removing owned cosmetic overrides…"
 msgstr ""
 
-#: dota_disabler/gui.py:1311
+#: dota_disabler/gui.py:1334
 msgid "Finalizing operation"
 msgstr ""
 
-#: dota_disabler/gui.py:1326
+#: dota_disabler/gui.py:1349
 msgid "Operation complete"
-msgstr ""
-
-#: dota_disabler/gui.py:1342
-#, python-brace-format
-msgid "Could not update the dashboard: {error}"
-msgstr ""
-
-#: dota_disabler/gui.py:1362
-msgid "Detected automatically"
 msgstr ""
 
 #: dota_disabler/gui.py:1365
 #, python-brace-format
+msgid "Could not update the dashboard: {error}"
+msgstr ""
+
+#: dota_disabler/gui.py:1385
+msgid "Detected automatically"
+msgstr ""
+
+#: dota_disabler/gui.py:1388
+#, python-brace-format
 msgid "Found Dota 2 at {path}"
 msgstr ""
 
-#: dota_disabler/gui.py:1369
+#: dota_disabler/gui.py:1392
 msgid "Dota was found, but the existing override folder could not be validated"
 msgstr ""
 
-#: dota_disabler/gui.py:1377
+#: dota_disabler/gui.py:1400
 msgid "Folder verified"
 msgstr ""
 
-#: dota_disabler/gui.py:1379
+#: dota_disabler/gui.py:1402
 msgid "Patch status refreshed."
 msgstr ""
 
-#: dota_disabler/gui.py:1386
+#: dota_disabler/gui.py:1409
 #, python-brace-format
 msgid "Build complete: {count} model/effect resource overrides."
 msgstr ""
 
-#: dota_disabler/gui.py:1391
+#: dota_disabler/gui.py:1414
 msgid "Build completed, but status refresh failed"
 msgstr ""
 
-#: dota_disabler/gui.py:1400
+#: dota_disabler/gui.py:1423
 #, python-brace-format
 msgid "Cleanup complete: {count} owned files removed."
 msgstr ""
 
-#: dota_disabler/gui.py:1406
+#: dota_disabler/gui.py:1429
 #, python-brace-format
 msgid ""
 "Remove '-language {language}' from Steam launch options if you no longer "
 "need it."
 msgstr ""
 
-#: dota_disabler/gui.py:1411
+#: dota_disabler/gui.py:1434
 msgid "Cleanup completed, but status refresh failed"
 msgstr ""
 
-#: dota_disabler/gui.py:1424 dota_disabler/gui.py:1467
+#: dota_disabler/gui.py:1447 dota_disabler/gui.py:1490
 msgid "ACTION NEEDED"
 msgstr ""
 
-#: dota_disabler/gui.py:1432
+#: dota_disabler/gui.py:1455
 #, python-brace-format
 msgid "{operation} failed: {error}"
 msgstr ""
 
-#: dota_disabler/gui.py:1443
+#: dota_disabler/gui.py:1466
 msgid "Not found · choose Browse"
 msgstr ""
 
-#: dota_disabler/gui.py:1448
+#: dota_disabler/gui.py:1471
 msgid "Unowned file protection"
 msgstr ""
 
-#: dota_disabler/gui.py:1450
+#: dota_disabler/gui.py:1473
 #, python-brace-format
 msgid ""
 "{error}\n"
@@ -318,49 +318,49 @@ msgid ""
 "the path or close this window."
 msgstr ""
 
-#: dota_disabler/gui.py:1454
+#: dota_disabler/gui.py:1477
 #, python-brace-format
 msgid "{operation} failed"
 msgstr ""
 
-#: dota_disabler/gui.py:1475
+#: dota_disabler/gui.py:1498
 #, python-brace-format
 msgid "{context}: {error}"
 msgstr ""
 
-#: dota_disabler/gui.py:1483
+#: dota_disabler/gui.py:1506
 msgid "Dota folder verified"
 msgstr ""
 
-#: dota_disabler/gui.py:1573 dota_disabler/gui.py:1583
+#: dota_disabler/gui.py:1596 dota_disabler/gui.py:1606
 msgid "Not available yet"
 msgstr ""
 
-#: dota_disabler/gui.py:1574
+#: dota_disabler/gui.py:1597
 msgid "Choose a Dota 2 folder or build overrides first."
 msgstr ""
 
-#: dota_disabler/gui.py:1584
+#: dota_disabler/gui.py:1607
 #, python-brace-format
 msgid ""
 "This path does not exist yet:\n"
 "{path}"
 msgstr ""
 
-#: dota_disabler/gui.py:1597
+#: dota_disabler/gui.py:1620
 msgid "Could not open path"
 msgstr ""
 
-#: dota_disabler/gui.py:1607
+#: dota_disabler/gui.py:1630
 #, python-brace-format
 msgid "Copied Steam launch option: {option}"
 msgstr ""
 
-#: dota_disabler/gui.py:1613
+#: dota_disabler/gui.py:1636
 msgid "Operation in progress"
 msgstr ""
 
-#: dota_disabler/gui.py:1615
+#: dota_disabler/gui.py:1638
 msgid ""
 "Keep this window open until the current operation finishes so deployment "
 "cannot be interrupted."
@@ -540,74 +540,74 @@ msgstr ""
 msgid "CURRENT"
 msgstr ""
 
-#: dota_disabler/gui_model.py:273
-msgid "Installed Dota build matches the build used for these overrides"
+#: dota_disabler/gui_model.py:274
+msgid "Installed Dota build and Steam language match these overrides"
 msgstr ""
 
-#: dota_disabler/gui_model.py:274 dota_disabler/gui_model.py:304
+#: dota_disabler/gui_model.py:276 dota_disabler/gui_model.py:308
 msgid "Rebuild Overrides"
 msgstr ""
 
-#: dota_disabler/gui_model.py:277
+#: dota_disabler/gui_model.py:279
 msgid "UPDATE FOUND"
 msgstr ""
 
-#: dota_disabler/gui_model.py:279
-msgid "Installed Dota build changed since the last build"
+#: dota_disabler/gui_model.py:282
+msgid "Installed Dota build or Steam language changed since the last build"
 msgstr ""
 
-#: dota_disabler/gui_model.py:280
+#: dota_disabler/gui_model.py:284
 msgid "Rebuild for Installed Build"
 msgstr ""
 
-#: dota_disabler/gui_model.py:283
+#: dota_disabler/gui_model.py:287
 msgid "REBUILD REQUIRED"
 msgstr ""
 
-#: dota_disabler/gui_model.py:285
+#: dota_disabler/gui_model.py:289
 msgid "Legacy loose overrides are no longer loaded by current Dota"
 msgstr ""
 
-#: dota_disabler/gui_model.py:286
+#: dota_disabler/gui_model.py:290
 msgid "Build VPK Overrides"
 msgstr ""
 
-#: dota_disabler/gui_model.py:289
+#: dota_disabler/gui_model.py:293
 msgid "REPAIR REQUIRED"
 msgstr ""
 
-#: dota_disabler/gui_model.py:291
-msgid "The owned VPK is missing or failed its checksum check"
+#: dota_disabler/gui_model.py:295
+msgid "An owned override file is missing or failed its checksum check"
 msgstr ""
 
-#: dota_disabler/gui_model.py:292
+#: dota_disabler/gui_model.py:296
 msgid "Repair Overrides"
 msgstr ""
 
-#: dota_disabler/gui_model.py:295
+#: dota_disabler/gui_model.py:299
 msgid "NOT BUILT"
 msgstr ""
 
-#: dota_disabler/gui_model.py:297
+#: dota_disabler/gui_model.py:301
 msgid "No owned disabler build marker was found"
 msgstr ""
 
-#: dota_disabler/gui_model.py:301
+#: dota_disabler/gui_model.py:305
 msgid "CHECK NEEDED"
 msgstr ""
 
-#: dota_disabler/gui_model.py:303
+#: dota_disabler/gui_model.py:307
 msgid "The previous run has no comparable Dota-build record"
 msgstr ""
 
-#: dota_disabler/gui_model.py:317
+#: dota_disabler/gui_model.py:321
 msgid "CHANGES PENDING"
 msgstr ""
 
-#: dota_disabler/gui_model.py:319
+#: dota_disabler/gui_model.py:323
 msgid "Category selection changed; rebuild to apply it"
 msgstr ""
 
-#: dota_disabler/gui_model.py:320
+#: dota_disabler/gui_model.py:324
 msgid "Apply Selection"
 msgstr ""

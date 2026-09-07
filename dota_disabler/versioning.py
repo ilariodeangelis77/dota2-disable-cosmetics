@@ -13,10 +13,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
-from .constants import HISTORY_FORMAT_VERSION, HISTORY_KIND
+from .constants import HISTORY_FORMAT_VERSION, HISTORY_KIND, RECOGNIZED_LANGUAGES
 from .domain import ProgressCallback
 from .errors import GeneratorError
-from .keyvalues import KVObject, TokenStream, obj_to_simple_dict, parse_value
+from .keyvalues import KVObject, TokenStream, as_str, obj_to_simple_dict, parse_value
 from .reporting import write_json
 
 
@@ -167,7 +167,26 @@ def parse_dota_appmanifest(path: Path) -> dict[str, str]:
     fields = obj_to_simple_dict(value)
     if fields.get("appid") != "570":
         raise ValueError(f"Steam app manifest is not for Dota 2 (app 570): {path}")
+    for section_name in ("UserConfig", "MountedConfig"):
+        section = value.get_last(section_name)
+        if not isinstance(section, KVObject):
+            continue
+        language = as_str(section.get_last("language"))
+        if language:
+            fields["language"] = language
+            break
     return fields
+
+
+def normalize_dota_interface_language(language: object) -> str:
+    """Return a safe Dota localization suffix, defaulting to English."""
+
+    if not isinstance(language, str) or not language.strip():
+        return "english"
+    normalized = language.strip().lower()
+    if normalized == "english" or normalized in RECOGNIZED_LANGUAGES:
+        return normalized
+    return "english"
 
 
 def capture_dota_version(dota: Path) -> dict:
@@ -181,6 +200,7 @@ def capture_dota_version(dota: Path) -> dict:
         "steam_build_id": None,
         "steam_last_updated_unix": None,
         "steam_manifest_path": None,
+        "steam_language": "english",
         "pak01_dir": {
             "size_bytes": stat.st_size,
             "mtime_ns": stat.st_mtime_ns,
@@ -198,7 +218,19 @@ def capture_dota_version(dota: Path) -> dict:
         return captured
     captured["steam_build_id"] = fields.get("buildid") or None
     captured["steam_last_updated_unix"] = fields.get("LastUpdated") or None
+    configured_language = fields.get("language")
+    captured["steam_language"] = normalize_dota_interface_language(configured_language)
+    if configured_language and captured["steam_language"] != configured_language.strip().lower():
+        captured["steam_language_error"] = (
+            f"Unsupported Steam language {configured_language!r}; using English localization."
+        )
     return captured
+
+
+def dota_interface_language(version: object) -> str:
+    if not isinstance(version, dict):
+        return "english"
+    return normalize_dota_interface_language(version.get("steam_language"))
 
 
 def dota_version_label(version: object) -> str:
@@ -229,8 +261,17 @@ def compare_dota_versions(recorded: object, current: object) -> tuple[str, str]:
         and isinstance(current_build, str)
         and current_build
     ):
-        state = "same" if recorded_build == current_build else "different"
-        return state, "Steam build ID"
+        if recorded_build != current_build:
+            return "different", "Steam build ID"
+        recorded_language = recorded.get("steam_language")
+        current_language = current.get("steam_language")
+        if (
+            isinstance(recorded_language, str)
+            and isinstance(current_language, str)
+            and recorded_language != current_language
+        ):
+            return "different", "Steam Dota language"
+        return "same", "Steam build ID"
     recorded_pak = recorded.get("pak01_dir")
     current_pak = current.get("pak01_dir")
     if isinstance(recorded_pak, dict) and isinstance(current_pak, dict):
@@ -251,6 +292,14 @@ def dota_changed_during_build(initial: dict, latest: dict) -> bool:
         and isinstance(latest_build, str)
         and latest_build
         and initial_build != latest_build
+    ):
+        return True
+    initial_language = initial.get("steam_language")
+    latest_language = latest.get("steam_language")
+    if (
+        isinstance(initial_language, str)
+        and isinstance(latest_language, str)
+        and initial_language != latest_language
     ):
         return True
     initial_pak = initial.get("pak01_dir")
@@ -314,10 +363,12 @@ __all__ = [
     "capture_dota_version",
     "compare_dota_versions",
     "dota_changed_during_build",
+    "dota_interface_language",
     "dota_operation_lock",
     "dota_version_label",
     "find_dota_appmanifest",
     "find_dota_install",
+    "normalize_dota_interface_language",
     "parse_dota_appmanifest",
     "read_version_history",
     "safely_append_version_history",

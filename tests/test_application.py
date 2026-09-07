@@ -123,6 +123,7 @@ class BuildOrchestrationTests(unittest.TestCase):
             },
         )
         updates: list[tuple[float, str]] = []
+        deploy_arguments: list[dict] = []
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -137,7 +138,8 @@ class BuildOrchestrationTests(unittest.TestCase):
                 root / name for name in ("items.txt", "heroes.txt", "units.txt")
             )
 
-            def fake_deploy(*_args, progress_update, **_kwargs):
+            def fake_deploy(*_args, progress_update, **kwargs):
+                deploy_arguments.append(kwargs)
                 progress_update(0, "Preparing override files")
                 progress_update(50.5, "Staged override files")
                 progress_update(100, "Override VPK installed")
@@ -194,6 +196,8 @@ class BuildOrchestrationTests(unittest.TestCase):
             "Staged override files",
             {message for _percent, message in updates},
         )
+        self.assertEqual(deploy_arguments[0]["dota_root"], dota)
+        self.assertEqual(deploy_arguments[0]["interface_language"], "english")
 
     def test_dota_change_after_planning_aborts_before_deploy_and_history(self):
         initial_version = {
