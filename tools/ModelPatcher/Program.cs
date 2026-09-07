@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.8.0";
+    private const string Version = "0.9.0";
 
     public static int Main(string[] args)
     {
@@ -37,14 +37,55 @@ internal static partial class Program
             {
                 return OffsetModelAttachments(args[1..]);
             }
+            if (args.Length > 0 && args[0] == "bridge-particle-body")
+            {
+                return BridgeParticleBody(args[1..]);
+            }
             throw new ArgumentException(
-                "Expected --version, patch, patch-batch, compose, or offset-attachments.");
+                "Expected --version, patch, patch-batch, compose, offset-attachments, "
+                + "or bridge-particle-body.");
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"ERROR: {exception.Message}");
             return 1;
         }
+    }
+
+    private static int BridgeParticleBody(string[] args)
+    {
+        var options = ParseOptions(
+            args,
+            "--input",
+            "--template",
+            "--output",
+            "--template-particle",
+            "--particle");
+        var inputPath = RequireFile(options, "--input", ".vmdl_c");
+        var templatePath = RequireFile(options, "--template", ".vmdl_c");
+        var outputPath = Path.GetFullPath(RequireOption(options, "--output"));
+        if (!outputPath.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The model output filename must end with .vmdl_c.");
+        }
+        if (string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(templatePath, outputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The particle-bridge output must not overwrite an input.");
+        }
+
+        var result = ModelParticleBridge.Build(
+            inputPath,
+            templatePath,
+            outputPath,
+            RequireOption(options, "--template-particle"),
+            RequireOption(options, "--particle"));
+        Console.WriteLine(
+            $"{{\"input_references\":{result.InputReferences},"
+            + $"\"output_references\":{result.OutputReferences},"
+            + $"\"particle_configs\":{result.ParticleConfigs},"
+            + $"\"output_bytes\":{result.OutputBytes}}}");
+        return 0;
     }
 
     private static int OffsetModelAttachments(string[] args)

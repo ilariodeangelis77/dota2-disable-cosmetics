@@ -43,6 +43,10 @@ def write_plan(
                     adjustment.category
                     for adjustment in plan.model_attachment_offsets
                 }
+                | {
+                    bridge.category
+                    for bridge in plan.model_particle_bridges
+                }
             ),
             "mappings": [asdict(mapping) for mapping in plan.mappings],
             "model_compositions": [
@@ -50,6 +54,9 @@ def write_plan(
             ],
             "model_attachment_offsets": [
                 asdict(adjustment) for adjustment in plan.model_attachment_offsets
+            ],
+            "model_particle_bridges": [
+                asdict(bridge) for bridge in plan.model_particle_bridges
             ],
             "unresolved": plan.unresolved,
         },

@@ -20,6 +20,7 @@ from .constants import (
     MODEL_CATEGORIES,
     RECOGNIZED_LANGUAGES,
     RESOURCE_MODEL,
+    RESOURCE_PARTICLE,
     SUPPORTED_CATEGORIES,
     VPK_ARCHIVE_CANDIDATES,
     VPK_DEPLOYMENT_MODE,
@@ -27,6 +28,7 @@ from .constants import (
 from .domain import CleanResult, Plan, ProgressCallback, ProgressUpdateCallback
 from .errors import GeneratorError, UnsafeOutputError
 from .model_patcher import (
+    bridge_model_particle,
     compose_models,
     offset_model_attachments,
     patch_model_material_groups_batch,
@@ -37,6 +39,7 @@ from .reporting import write_json
 from .resources import (
     compiled_model_path,
     compiled_override_path,
+    compiled_particle_path,
     is_safe_resource_path,
 )
 from .version import VERSION
@@ -243,6 +246,10 @@ def deploy_overrides(
                 adjustment.category
                 for adjustment in plan.model_attachment_offsets
             }
+            | {
+                bridge.category
+                for bridge in plan.model_particle_bridges
+            }
         )
     )
     deployment_progress = WeightedProgress(progress_update, DEPLOYMENT_PHASE_WEIGHTS)
@@ -262,8 +269,13 @@ def deploy_overrides(
         skin_patch_mappings
         or plan.model_compositions
         or plan.model_attachment_offsets
+        or plan.model_particle_bridges
     ) and model_patcher is None:
-        if plan.model_compositions or plan.model_attachment_offsets:
+        if (
+            plan.model_compositions
+            or plan.model_attachment_offsets
+            or plan.model_particle_bridges
+        ):
             raise GeneratorError(
                 "Reviewed model transformations require the bundled model helper, but it "
                 "was not found. The Dota directory was not modified."
@@ -290,6 +302,9 @@ def deploy_overrides(
     ] = []
     attachment_offset_jobs: list[
         tuple[Path, Path, str, tuple[str, ...], tuple[float, float, float]]
+    ] = []
+    particle_bridge_jobs: list[
+        tuple[Path, Path, Path, str, str, str, int]
     ] = []
     ready_composition_targets: set[str] = set()
     ready_attachment_offset_targets: set[str] = set()
@@ -340,6 +355,20 @@ def deploy_overrides(
             )
         attachment_offset_targets.add(target_relative)
 
+    particle_bridge_targets: set[str] = set()
+    for bridge in plan.model_particle_bridges:
+        target_relative = compiled_model_path(bridge.target)
+        if target_relative in particle_bridge_targets:
+            raise GeneratorError(
+                f"Multiple particle-body bridges target the same resource: {bridge.target}"
+            )
+        if target_relative in composition_targets or target_relative in attachment_offset_targets:
+            raise GeneratorError(
+                "A particle-body bridge conflicts with another reviewed model "
+                f"transformation: {bridge.target}"
+            )
+        particle_bridge_targets.add(target_relative)
+
     required_groups_by_target = {
         compiled_model_path(mapping.target): mapping.required_material_groups
         for mapping in plan.mappings
@@ -347,6 +376,7 @@ def deploy_overrides(
     }
     staging_count = (
         len(plan.model_attachment_offsets)
+        + len(plan.model_particle_bridges)
         + len(plan.model_compositions)
         + len(plan.mappings)
     )
@@ -382,6 +412,52 @@ def deploy_overrides(
                 "Checking attachment-offset inputs "
                 f"({index:,} of {staging_count:,})"
             ),
+        )
+
+    for index, bridge in enumerate(plan.model_particle_bridges, start=1):
+        target_relative = compiled_model_path(bridge.target)
+        source_relative = compiled_model_path(bridge.source_model)
+        template_relative = compiled_model_path(bridge.template_model)
+        particle_relative = compiled_particle_path(bridge.source_particle)
+        source = path_under(cache, source_relative)
+        template = path_under(cache, template_relative)
+        particle = path_under(cache, particle_relative)
+        sources_ready = True
+        for role, source_name, source_path, resource_type in (
+            ("base_model", bridge.source_model, source, RESOURCE_MODEL),
+            ("particle_template", bridge.template_model, template, RESOURCE_MODEL),
+            ("private_particle_source", bridge.source_particle, particle, RESOURCE_PARTICLE),
+        ):
+            if source_path.is_file():
+                continue
+            sources_ready = False
+            record_missing(
+                source_name,
+                bridge.target,
+                bridge.reason,
+                resource_type,
+                bridge.item_id,
+                composition_role=role,
+            )
+        if sources_ready:
+            destination = path_under(staging, target_relative)
+            particle_bridge_jobs.append(
+                (
+                    source,
+                    template,
+                    destination,
+                    target_relative,
+                    bridge.template_particle,
+                    bridge.private_particle,
+                    required_groups_by_target.get(target_relative, 1),
+                )
+            )
+        completed = len(plan.model_attachment_offsets) + index
+        deployment_progress.work(
+            "staging",
+            completed,
+            staging_count,
+            f"Checking particle-body bridge inputs ({index:,} of {staging_count:,})",
         )
 
     for index, composition in enumerate(plan.model_compositions, start=1):
@@ -437,7 +513,9 @@ def deploy_overrides(
             ready_composition_targets.add(target_relative)
         deployment_progress.work(
             "staging",
-            len(plan.model_attachment_offsets) + index,
+            len(plan.model_attachment_offsets)
+            + len(plan.model_particle_bridges)
+            + index,
             staging_count,
             f"Checking composed-model inputs ({index:,} of {staging_count:,})",
         )
@@ -448,12 +526,14 @@ def deploy_overrides(
         target_relative = compiled_override_path(mapping.target, mapping.resource_type)
         completed = (
             len(plan.model_attachment_offsets)
+            + len(plan.model_particle_bridges)
             + len(plan.model_compositions)
             + index
         )
         if (
             target_relative in ready_composition_targets
             or target_relative in ready_attachment_offset_targets
+            or target_relative in particle_bridge_targets
         ):
             deployment_progress.work(
                 "staging",
@@ -525,6 +605,18 @@ def deploy_overrides(
         )
         in composition_jobs
     )
+    particle_bridge_patch_count = sum(
+        required_groups > 1
+        for (
+            _source,
+            _template,
+            _destination,
+            _target,
+            _template_particle,
+            _private_particle,
+            required_groups,
+        ) in particle_bridge_jobs
+    )
     composition_transform_count = sum(
         1 + len(additional_sources)
         for (
@@ -539,11 +631,14 @@ def deploy_overrides(
     )
     model_work_total = (
         len(attachment_offset_jobs)
+        + len(particle_bridge_jobs)
         + composition_transform_count
         + len(patch_jobs)
         + composition_patch_count
+        + particle_bridge_patch_count
     )
     composition_intermediates: list[Path] = []
+    particle_bridge_intermediates: list[Path] = []
     for index, (
         source,
         destination,
@@ -569,6 +664,43 @@ def deploy_overrides(
                 f"({index:,} of {len(attachment_offset_jobs):,})"
             ),
         )
+
+    for index, (
+        source,
+        template,
+        destination,
+        _target_relative,
+        template_particle,
+        private_particle,
+        required_groups,
+    ) in enumerate(particle_bridge_jobs, start=1):
+        assert model_patcher is not None
+        bridge_output = destination
+        if required_groups > 1:
+            bridge_output = destination.with_name(
+                f".{destination.stem}.particle-bridge-input{destination.suffix}"
+            )
+            particle_bridge_intermediates.append(bridge_output)
+        bridge_model_particle(
+            model_patcher,
+            source,
+            template,
+            bridge_output,
+            template_particle,
+            private_particle,
+            progress=progress,
+        )
+        deployment_progress.work(
+            "model_patch",
+            len(attachment_offset_jobs) + index,
+            model_work_total,
+            (
+                "Restoring particle-bodied heroes "
+                f"({index:,} of {len(particle_bridge_jobs):,})"
+            ),
+        )
+        if required_groups > 1:
+            patch_jobs.append((bridge_output, destination, required_groups))
 
     composition_operations_completed = 0
     for (
@@ -609,7 +741,9 @@ def deploy_overrides(
             composition_operations_completed += 1
             deployment_progress.work(
                 "model_patch",
-                len(attachment_offset_jobs) + composition_operations_completed,
+                len(attachment_offset_jobs)
+                + len(particle_bridge_jobs)
+                + composition_operations_completed,
                 model_work_total,
                 (
                     "Composing reviewed models "
@@ -625,7 +759,9 @@ def deploy_overrides(
     if patch_jobs:
         assert model_patcher is not None
         completed_transformations = (
-            len(attachment_offset_jobs) + composition_transform_count
+            len(attachment_offset_jobs)
+            + len(particle_bridge_jobs)
+            + composition_transform_count
         )
 
         def model_patch_progress(
@@ -650,6 +786,9 @@ def deploy_overrides(
     for intermediate in composition_intermediates:
         if intermediate.is_file():
             intermediate.unlink()
+    for intermediate in particle_bridge_intermediates:
+        if intermediate.is_file():
+            intermediate.unlink()
     staged_files.extend(
         target_relative
         for _source, _destination, target_relative, _attachments, _offset
@@ -667,6 +806,18 @@ def deploy_overrides(
             _mode,
         )
         in composition_jobs
+    )
+    staged_files.extend(
+        target_relative
+        for (
+            _source,
+            _template,
+            _destination,
+            target_relative,
+            _template_particle,
+            _private_particle,
+            _required_groups,
+        ) in particle_bridge_jobs
     )
     deployment_progress.complete("model_patch", "Compiled default models ready")
 

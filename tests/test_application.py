@@ -14,12 +14,43 @@ from dota_disabler.domain import (
     ModelAttachmentOffset,
     ModelComposition,
     ModelCompositionPart,
+    ModelParticleBridge,
     Plan,
 )
 from dota_disabler.errors import GeneratorError
 
 
 class BuildOrchestrationTests(unittest.TestCase):
+    def test_particle_bridge_sources_are_included_in_vpk_extraction(self):
+        bridge = ModelParticleBridge(
+            source_model="models/heroes/wisp/wisp.vmdl",
+            template_model="models/items/io/madame.vmdl",
+            target="models/items/io/madame.vmdl",
+            source_particle="particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+            private_particle="particles/private/wisp_ambient.vpcf",
+            template_particle="particles/econ/items/wisp/io_carnival_ambient.vpcf",
+            reason="reviewed test bridge",
+            category="standard_wearables",
+            item_id="34398",
+            hero="npc_dota_hero_wisp",
+            slot="head",
+        )
+        plan = Plan(
+            mappings=[],
+            unresolved=[],
+            stats={},
+            model_particle_bridges=[bridge],
+        )
+
+        self.assertEqual(
+            application._source_resources_for_plan(plan),
+            {
+                "models/heroes/wisp/wisp.vmdl_c",
+                "models/items/io/madame.vmdl_c",
+                "particles/units/heroes/hero_wisp/wisp_ambient.vpcf_c",
+            },
+        )
+
     def test_attachment_offset_source_is_included_in_vpk_extraction(self):
         adjustment = ModelAttachmentOffset(
             source="models/heroes/test/loadout_rig.vmdl",

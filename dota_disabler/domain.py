@@ -92,6 +92,23 @@ class ModelAttachmentOffset:
     slot: str
 
 
+@dataclass(frozen=True)
+class ModelParticleBridge:
+    """Add a reviewed model-owned particle while retaining the base model payload."""
+
+    source_model: str
+    template_model: str
+    target: str
+    source_particle: str
+    private_particle: str
+    template_particle: str
+    reason: str
+    category: str
+    item_id: str
+    hero: str
+    slot: str
+
+
 @dataclass
 class Plan:
     mappings: list[Mapping]
@@ -99,6 +116,7 @@ class Plan:
     stats: dict[str, int]
     model_compositions: list[ModelComposition] = field(default_factory=list)
     model_attachment_offsets: list[ModelAttachmentOffset] = field(default_factory=list)
+    model_particle_bridges: list[ModelParticleBridge] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -142,6 +160,7 @@ __all__ = [
     "ModelAttachmentOffset",
     "ModelComposition",
     "ModelCompositionPart",
+    "ModelParticleBridge",
     "Plan",
     "ProgressCallback",
     "ProgressUpdateCallback",

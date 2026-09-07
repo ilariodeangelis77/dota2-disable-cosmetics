@@ -2400,26 +2400,147 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.stats["bodygroup_schema_items_reset"], 0)
         self.assertEqual(plan.stats["bodygroup_sensitive_models_skipped"], 0)
 
-    def test_reviewed_whole_hero_wearable_uses_hero_default(self):
-        default = item(1, slot="head", baseitem="1")
+    def test_reviewed_particle_body_uses_an_atomic_model_and_ambient_bridge(self):
+        hero = "npc_dota_hero_wisp"
+        default_ambient = item(
+            536,
+            slot="ambient_effects",
+            hero=hero,
+            baseitem="1",
+            visuals=[
+                {
+                    "type": "particle_create",
+                    "modifier": "particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+                }
+            ],
+        )
         whole_hero = item(
             34398,
             slot="head",
-            model="models/items/test/whole_hero.vmdl",
+            hero=hero,
+            model="models/items/io/dark_carnival_io/dark_carnival_io.vmdl",
+            visuals=[
+                {
+                    "type": "particle",
+                    "asset": "particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+                    "modifier": "particles/error/null.vpcf",
+                },
+                {
+                    "type": "particle",
+                    "asset": (
+                        "particles/units/heroes/hero_wisp/"
+                        "wisp_ambient_entity_tentacles.vpcf"
+                    ),
+                    "modifier": "particles/error/null.vpcf",
+                },
+            ],
         )
 
         plan = generator.build_plan(
             {},
-            {record.item_id: record for record in (default, whole_hero)},
-            {HERO: "models/heroes/test/test.vmdl"},
+            {record.item_id: record for record in (default_ambient, whole_hero)},
+            {hero: "models/heroes/wisp/wisp.vmdl"},
             [],
         )
 
-        self.assertEqual(plan.mappings[0].source, "models/heroes/test/test.vmdl")
-        self.assertEqual(
-            plan.mappings[0].reason,
-            "whole-hero wearable replaced with hero default",
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        model_target = "models/items/io/dark_carnival_io/dark_carnival_io.vmdl"
+        private_particle = (
+            "particles/dota2_cosmetic_disabler/heroes/wisp/"
+            "wisp_ambient_34398.vpcf"
         )
+        self.assertEqual(by_target[model_target].source, "models/heroes/wisp/wisp.vmdl")
+        self.assertEqual(
+            by_target[private_particle].source,
+            "particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+        )
+        self.assertEqual(len(plan.model_particle_bridges), 1)
+        bridge = plan.model_particle_bridges[0]
+        self.assertEqual(bridge.target, model_target)
+        self.assertEqual(bridge.private_particle, private_particle)
+        self.assertEqual(
+            bridge.template_particle,
+            "particles/econ/items/wisp/io_carnival/io_carnival_ambient.vpcf",
+        )
+        self.assertEqual(plan.stats["particle_body_bridges_planned"], 1)
+        self.assertEqual(plan.stats["particle_body_bridges_preserved"], 0)
+
+    def test_particle_body_is_preserved_when_particle_effects_are_disabled(self):
+        hero = "npc_dota_hero_wisp"
+        whole_hero = item(
+            34398,
+            slot="head",
+            hero=hero,
+            model="models/items/io/dark_carnival_io/dark_carnival_io.vmdl",
+        )
+
+        plan = generator.build_plan(
+            {},
+            {whole_hero.item_id: whole_hero},
+            {hero: "models/heroes/wisp/wisp.vmdl"},
+            [],
+            enabled_categories={generator.CATEGORY_STANDARD_WEARABLES},
+        )
+
+        self.assertEqual(plan.mappings, [])
+        self.assertEqual(plan.model_particle_bridges, [])
+        self.assertEqual(plan.stats["particle_body_bridges_preserved"], 1)
+        self.assertEqual(plan.unresolved[0]["type"], "particle_body_bridge")
+        self.assertIn("particle effects are disabled", plan.unresolved[0]["reason"])
+
+    def test_missing_particle_body_source_drops_the_model_override_too(self):
+        hero = "npc_dota_hero_wisp"
+        default_ambient = item(
+            536,
+            slot="ambient_effects",
+            hero=hero,
+            baseitem="1",
+            visuals=[
+                {
+                    "type": "particle_create",
+                    "modifier": "particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+                }
+            ],
+        )
+        whole_hero = item(
+            34398,
+            slot="head",
+            hero=hero,
+            model="models/items/io/dark_carnival_io/dark_carnival_io.vmdl",
+            visuals=[
+                {
+                    "type": "particle",
+                    "asset": "particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+                    "modifier": "particles/error/null.vpcf",
+                },
+                {
+                    "type": "particle",
+                    "asset": (
+                        "particles/units/heroes/hero_wisp/"
+                        "wisp_ambient_entity_tentacles.vpcf"
+                    ),
+                    "modifier": "particles/error/null.vpcf",
+                },
+            ],
+        )
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default_ambient, whole_hero)},
+            {hero: "models/heroes/wisp/wisp.vmdl"},
+            [],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            adjusted = generator.apply_missing_particle_fallbacks(
+                plan,
+                Path(temporary),
+            )
+
+        self.assertEqual(adjusted.mappings, [])
+        self.assertEqual(adjusted.model_particle_bridges, [])
+        self.assertEqual(adjusted.stats["particle_body_bridges_planned"], 0)
+        self.assertEqual(adjusted.stats["particle_body_bridges_preserved"], 1)
+        self.assertIn("bridge source is unavailable", adjusted.unresolved[-1]["reason"])
 
     def test_witch_doctor_integrated_back_uses_skeleton_compatible_hero(self):
         hero = "npc_dota_hero_witch_doctor"
@@ -3593,6 +3714,67 @@ class GuiViewModelTests(unittest.TestCase):
 
 
 class ModelPatcherDiscoveryTests(unittest.TestCase):
+    def test_particle_body_bridge_result_is_verified(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "wisp.vmdl_c"
+            template = root / "madame.vmdl_c"
+            destination = root / "output" / "madame.vmdl_c"
+            source.write_bytes(b"base Io")
+            template.write_bytes(b"Madame template")
+
+            def fake_run(command, *, quiet):
+                self.assertTrue(quiet)
+                destination.write_bytes(b"base Io with private ambient")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps(
+                        {
+                            "input_references": 3,
+                            "output_references": 4,
+                            "particle_configs": 1,
+                            "output_bytes": destination.stat().st_size,
+                        }
+                    ),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run) as run_helper:
+                model_patcher.bridge_model_particle(
+                    root / "patcher.exe",
+                    source,
+                    template,
+                    destination,
+                    "particles/econ/items/wisp/io_carnival/io_carnival_ambient.vpcf",
+                    (
+                        "particles/dota2_cosmetic_disabler/heroes/wisp/"
+                        "wisp_ambient_34398.vpcf"
+                    ),
+                    progress=lambda _message: None,
+                )
+
+        self.assertEqual(
+            run_helper.call_args.args[0],
+            [
+                str(root / "patcher.exe"),
+                "bridge-particle-body",
+                "--input",
+                str(source),
+                "--template",
+                str(template),
+                "--output",
+                str(destination),
+                "--template-particle",
+                "particles/econ/items/wisp/io_carnival/io_carnival_ambient.vpcf",
+                "--particle",
+                (
+                    "particles/dota2_cosmetic_disabler/heroes/wisp/"
+                    "wisp_ambient_34398.vpcf"
+                ),
+            ],
+        )
+
     def test_attachment_offset_result_is_verified(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -3827,7 +4009,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.8\.0.*0\.1\.0",
+                r"Expected 0\.9\.0.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))
@@ -3924,6 +4106,52 @@ class DeploymentTests(unittest.TestCase):
                 model_compositions=[composition],
             ),
             composition,
+        )
+
+    def make_particle_bridge_plan(self):
+        bridge = generator.ModelParticleBridge(
+            source_model="models/heroes/wisp/wisp.vmdl",
+            template_model="models/items/io/madame.vmdl",
+            target="models/items/io/madame.vmdl",
+            source_particle="particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
+            private_particle=(
+                "particles/dota2_cosmetic_disabler/heroes/wisp/"
+                "wisp_ambient_34398.vpcf"
+            ),
+            template_particle="particles/econ/items/wisp/io_carnival_ambient.vpcf",
+            reason="reviewed particle body",
+            category=generator.CATEGORY_STANDARD_WEARABLES,
+            item_id="34398",
+            hero="npc_dota_hero_wisp",
+            slot="head",
+        )
+        return (
+            generator.Plan(
+                mappings=[
+                    generator.Mapping(
+                        source=bridge.source_model,
+                        target=bridge.target,
+                        reason=bridge.reason,
+                        item_id=bridge.item_id,
+                        hero=bridge.hero,
+                        slot=bridge.slot,
+                    ),
+                    generator.Mapping(
+                        source=bridge.source_particle,
+                        target=bridge.private_particle,
+                        reason="private ambient",
+                        category=generator.CATEGORY_PARTICLE_EFFECTS,
+                        resource_type=generator.RESOURCE_PARTICLE,
+                        item_id=bridge.item_id,
+                        hero=bridge.hero,
+                        slot=bridge.slot,
+                    ),
+                ],
+                unresolved=[],
+                stats={},
+                model_particle_bridges=[bridge],
+            ),
+            bridge,
         )
 
     def test_operation_lock_rejects_an_overlapping_build_or_cleanup(self):
@@ -4148,6 +4376,137 @@ class DeploymentTests(unittest.TestCase):
                     unpacked / generator.compiled_model_path(target)
                 ).read_bytes(),
                 b"verified head and cape composite",
+            )
+
+    def test_particle_body_bridge_replaces_the_direct_model_and_stages_its_alias(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        plan, bridge = self.make_particle_bridge_plan()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            source = cache / generator.compiled_model_path(bridge.source_model)
+            template = cache / generator.compiled_model_path(bridge.template_model)
+            particle = cache / generator.compiled_particle_path(bridge.source_particle)
+            for path, payload in (
+                (source, b"base Io"),
+                (template, b"Madame template"),
+                (particle, b"normal Io ambient"),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+            output = root / "dota_dutch"
+
+            def fake_bridge(
+                _patcher,
+                source_model,
+                template_model,
+                destination,
+                template_particle,
+                private_particle,
+                *,
+                progress,
+            ):
+                self.assertTrue(os.path.samefile(source_model, source))
+                self.assertTrue(os.path.samefile(template_model, template))
+                self.assertEqual(template_particle, bridge.template_particle)
+                self.assertEqual(private_particle, bridge.private_particle)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(b"base Io with private ambient")
+                progress("bridged")
+
+            with patch(
+                "dota_disabler.deployment.bridge_model_particle",
+                side_effect=fake_bridge,
+            ) as bridge_model:
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual((copied, missing), (2, []))
+            bridge_model.assert_called_once()
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            unpacked = root / "unpacked-particle-body"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                marker["resources"],
+                unpacked,
+            )
+            self.assertEqual(
+                (unpacked / generator.compiled_model_path(bridge.target)).read_bytes(),
+                b"base Io with private ambient",
+            )
+            self.assertEqual(
+                (
+                    unpacked / generator.compiled_particle_path(bridge.private_particle)
+                ).read_bytes(),
+                b"normal Io ambient",
+            )
+
+    def test_particle_body_bridge_is_not_built_without_its_particle_source(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        plan, bridge = self.make_particle_bridge_plan()
+        unrelated = generator.Mapping(
+            source="models/heroes/test/default.vmdl",
+            target="models/items/test/cosmetic.vmdl",
+            reason="unrelated deployable mapping",
+        )
+        plan.mappings.append(unrelated)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            for resource, payload in (
+                (bridge.source_model, b"base Io"),
+                (bridge.template_model, b"Madame template"),
+            ):
+                path = cache / generator.compiled_model_path(resource)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+            unrelated_source = cache / generator.compiled_model_path(unrelated.source)
+            unrelated_source.parent.mkdir(parents=True, exist_ok=True)
+            unrelated_source.write_bytes(b"unrelated model")
+            output = root / "dota_dutch"
+
+            with patch("dota_disabler.deployment.bridge_model_particle") as bridge_model:
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=True,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual(copied, 1)
+            self.assertTrue(
+                any(
+                    entry["source"] == bridge.source_particle
+                    and entry["composition_role"] == "private_particle_source"
+                    for entry in missing
+                )
+            )
+            bridge_model.assert_not_called()
+            marker = generator.read_marker(output, allow_shared_directory=True)
+            self.assertEqual(
+                marker["resources"],
+                [generator.compiled_model_path(unrelated.target)],
             )
 
     def test_multi_stage_composition_builds_and_cleans_intermediate_models(self):

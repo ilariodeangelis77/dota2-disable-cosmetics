@@ -138,7 +138,7 @@ is disabled during those operations so their presentation cannot change midway t
 | Wearables and attachments | Normal and alternate-style `model_player` resources, integrated-slot items, bodygroup-sensitive compatibility models, and `additional_wearable` attachments. |
 | Hero transformations | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, model-to-model, pet, summon, ward, and similar special-model rules. |
 | Personas — experimental | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. This remains independently selectable because its coverage has more known edge cases. |
-| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, and particle snapshots. |
+| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, particle snapshots, and reviewed particle-bodied hero restoration. |
 
 Where applicable, selected model categories also restore confidently matched material variants and
 add compatible base-material groups to copied default models.
@@ -147,6 +147,13 @@ Mappings are derived from schema mechanics rather than cosmetic names. Some Arca
 belong to **Wearables and attachments**, while a transformation and its related attachments remain
 together under **Hero transformations** or **Personas**. The dashboard groups five internal planner
 categories into these four user-facing choices; the CLI retains the detailed category names.
+
+Madame Scrio uses a reviewed compound restoration because Io's readable body is a particle effect.
+When both **Wearables and attachments** and **Particles and effects** are selected, the generated
+model keeps base Io's geometry and adds the normal ambient through a private model-owned particle
+path that Madame Scrio's suppression rule cannot redirect to Dota's null effect. If either half of
+that bridge is unavailable, the patcher leaves Madame Scrio unchanged instead of producing an empty
+Io.
 
 ### Known limitations
 
@@ -304,7 +311,9 @@ not available.
 3. Only required resources and English localization compatibility files are extracted.
 4. Skin-sensitive model copies receive duplicate base-material groups when a selected style index
    would otherwise render an error material. Reviewed model-less wearable proxies can use composed
-   compatible defaults. Original mesh and vertex-buffer blocks remain byte-identical.
+   compatible defaults. Reviewed particle-bodied heroes can receive a private default-particle
+   configuration without copying cosmetic model payloads. Original mesh and vertex-buffer blocks
+   remain byte-identical.
 5. The helper creates the numbered VPK, reopens every packed entry, and validates its CRC before
    deployment.
 6. The application records the archive checksum, selected categories, mount, and Dota build in an
@@ -327,12 +336,12 @@ Every release is checked at three levels:
 3. **In-game checks** confirm representative heroes, effects, and reviewed Persona bridges in the
    Armory, Demo Hero, or a custom lobby.
 
-The latest full audit packed, reopened, and CRC-validated **16,487 generated resources** with no
+The latest full audit packed, reopened, and CRC-validated **16,490 generated resources** with no
 missing final sources.
 
-Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, and the Morphling, Oracle,
-Axe, Legion Commander, and Bristleback Automatons. Dota updates can change resources or rendering
-behavior, so verify a new build before using it in normal play.
+Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, Madame Scrio, and the
+Morphling, Oracle, Axe, Legion Commander, and Bristleback Automatons. Dota updates can change
+resources or rendering behavior, so verify a new build before using it in normal play.
 
 ## Development
 

@@ -30,6 +30,7 @@ from ..domain import (
     ModelAttachmentOffset,
     ModelComposition,
     ModelCompositionPart,
+    ModelParticleBridge,
 )
 from ..resources import (
     canonical,
@@ -83,6 +84,8 @@ COUNTER_NAMES = (
     "mapping_conflicts",
     "particle_defaults_resolved_transitively",
     "particle_resolution_cycles",
+    "particle_body_bridges_planned",
+    "particle_body_bridges_preserved",
 )
 
 
@@ -122,6 +125,7 @@ class PlanningContext:
     candidates: list[Mapping] = field(default_factory=list)
     model_compositions: list[ModelComposition] = field(default_factory=list)
     model_attachment_offsets: list[ModelAttachmentOffset] = field(default_factory=list)
+    model_particle_bridges: list[ModelParticleBridge] = field(default_factory=list)
     unresolved: list[dict] = field(default_factory=list)
     default_sources_by_target: dict[str, set[str]] = field(default_factory=dict)
     pending_model_overrides: list[PendingModelOverride] = field(default_factory=list)

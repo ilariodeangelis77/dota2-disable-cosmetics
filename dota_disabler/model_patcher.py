@@ -16,7 +16,7 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
-MODEL_PATCHER_VERSION = "0.8.0"
+MODEL_PATCHER_VERSION = "0.9.0"
 MODEL_COMPOSITION_MODES = frozenset(
     {"shared-root", "skeleton-overlay", "skeleton-union"}
 )
@@ -43,8 +43,8 @@ def find_model_patcher(explicit: Optional[str] = None) -> Path:
         (
             runtime_asset_root() / "tools" / executable_name,
             project_root / "tools" / executable_name,
-            project_root / "build/model-patcher" / executable_name,
             project_root / "tools/ModelPatcher/bin/Release/net10.0" / executable_name,
+            project_root / "build/model-patcher" / executable_name,
         )
     )
     found = shutil.which(executable_name)
@@ -244,6 +244,53 @@ def offset_model_attachments(
         ) from exc
 
 
+def bridge_model_particle(
+    patcher: Path,
+    source_model: Path,
+    template_model: Path,
+    destination: Path,
+    template_particle: str,
+    private_particle: str,
+    *,
+    progress: ProgressCallback = print,
+) -> None:
+    """Add one reviewed persistent particle configuration to a base model."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    progress(f"Restoring reviewed particle-bodied hero: {destination.name}")
+    process = run(
+        [
+            str(patcher),
+            "bridge-particle-body",
+            "--input",
+            str(source_model),
+            "--template",
+            str(template_model),
+            "--output",
+            str(destination),
+            "--template-particle",
+            template_particle,
+            "--particle",
+            private_particle,
+        ],
+        quiet=True,
+    )
+    try:
+        result = json.loads(process.stdout or "")
+        if (
+            int(result["particle_configs"]) != 1
+            or int(result["output_references"])
+            != int(result["input_references"]) + 1
+            or not destination.is_file()
+            or int(result["output_bytes"]) != destination.stat().st_size
+        ):
+            raise ValueError("inconsistent particle-body bridge verification")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise GeneratorError(
+            "The internal model helper returned an invalid particle-body bridge result."
+        ) from exc
+
+
 def patch_model_material_groups_batch(
     patcher: Path,
     requests: Iterable[tuple[Path, Path, int]],
@@ -304,6 +351,7 @@ def patch_model_material_groups_batch(
 
 __all__ = [
     "MODEL_PATCHER_VERSION",
+    "bridge_model_particle",
     "compose_models",
     "find_model_patcher",
     "offset_model_attachments",

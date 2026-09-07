@@ -18,12 +18,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from dota_disabler.application import load_or_extract_schema, parse_schemas
+from dota_disabler.application import (
+    _source_resources_for_plan,
+    load_or_extract_schema,
+    parse_schemas,
+)
 from dota_disabler.constants import (
     DEFAULT_CATEGORIES,
     INTENTIONALLY_NEUTRAL_PARTICLE_DEFAULTS,
     INTENTIONALLY_NEUTRAL_PARTICLE_PREFIXES,
-    NEUTRAL_PARTICLE,
     RESOURCE_MATERIAL,
     RESOURCE_PARTICLE,
 )
@@ -34,12 +37,12 @@ from dota_disabler.model_patcher import (
     validate_model_patcher,
 )
 from dota_disabler.planning import apply_missing_particle_fallbacks, apply_model_skin_material_fallbacks
+from dota_disabler.planning.particle_bodies import PARTICLE_BODY_PROFILES
 from dota_disabler.reporting import write_plan
 from dota_disabler.resources import (
     compiled_material_path,
     compiled_model_path,
     compiled_override_path,
-    compiled_particle_path,
     looks_like_model,
 )
 from dota_disabler.version import VERSION
@@ -112,25 +115,7 @@ def audit_live_install(
         items, heroes, units = load_or_extract_schema(dota, extractor, cache)
         plan = parse_schemas(items, heroes, units)
 
-        source_resources = {
-            compiled_override_path(mapping.source, mapping.resource_type)
-            for mapping in plan.mappings
-        }
-        source_resources.update(
-            compiled_model_path(source)
-            for composition in plan.model_compositions
-            for source in (
-                composition.primary_source,
-                composition.secondary_source,
-                *(part.source for part in composition.additional_parts),
-            )
-        )
-        source_resources.update(
-            compiled_model_path(adjustment.source)
-            for adjustment in plan.model_attachment_offsets
-        )
-        if any(mapping.resource_type == RESOURCE_PARTICLE for mapping in plan.mappings):
-            source_resources.add(compiled_particle_path(NEUTRAL_PARTICLE))
+        source_resources = _source_resources_for_plan(plan)
         extract_vpk(extractor, game_pak, sorted(source_resources), cache)
 
         plan = apply_model_skin_material_fallbacks(plan, cache)
@@ -139,6 +124,7 @@ def audit_live_install(
             plan.stats.get("alternate_skin_group_patch_targets", 0)
             or plan.model_compositions
             or plan.model_attachment_offsets
+            or plan.model_particle_bridges
         ):
             model_patcher = find_model_patcher(model_patcher_path)
             validate_model_patcher(model_patcher)
@@ -171,6 +157,20 @@ def audit_live_install(
             ).is_file()
         ]
         plan = apply_missing_particle_fallbacks(plan, cache)
+
+        _, item_records, _ = load_items_game(items)
+        expected_particle_body_items = set(PARTICLE_BODY_PROFILES).intersection(item_records)
+        planned_particle_body_items = {
+            bridge.item_id for bridge in plan.model_particle_bridges
+        }
+        missing_particle_body_bridges = sorted(
+            expected_particle_body_items - planned_particle_body_items
+        )
+        if missing_particle_body_bridges:
+            raise RuntimeError(
+                "Reviewed particle-body bridge(s) were not planned: "
+                + ", ".join(missing_particle_body_bridges)
+            )
 
         missing_sources = sorted(
             {
@@ -221,6 +221,10 @@ def audit_live_install(
                 compiled_model_path(adjustment.target)
                 for adjustment in plan.model_attachment_offsets
             )
+            expected_targets.update(
+                compiled_model_path(bridge.target)
+                for bridge in plan.model_particle_bridges
+            )
             if packed_resources != len(expected_targets):
                 raise RuntimeError(
                     "Packed resource count does not match the final target count: "
@@ -230,7 +234,6 @@ def audit_live_install(
         if report is not None:
             write_plan(plan, report, enabled_categories=DEFAULT_CATEGORIES)
 
-        _, item_records, _ = load_items_game(items)
         named_regressions = {}
         for label, marker in REGRESSION_ITEM_GROUPS.items():
             matching_items = {

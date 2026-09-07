@@ -155,6 +155,15 @@ def _source_resources_for_plan(plan: Plan) -> set[str]:
         compiled_model_path(adjustment.source)
         for adjustment in plan.model_attachment_offsets
     )
+    resources.update(
+        compiled_model_path(model)
+        for bridge in plan.model_particle_bridges
+        for model in (bridge.source_model, bridge.template_model)
+    )
+    resources.update(
+        compiled_particle_path(bridge.source_particle)
+        for bridge in plan.model_particle_bridges
+    )
     if any(mapping.resource_type == RESOURCE_PARTICLE for mapping in plan.mappings):
         resources.add(compiled_particle_path(NEUTRAL_PARTICLE))
     return resources
@@ -279,7 +288,8 @@ def _build_cosmetics_unlocked(
         (
             f"Planned {len(plan.mappings):,} replacement mapping(s) and "
             f"{len(plan.model_compositions):,} model composition(s), plus "
-            f"{len(plan.model_attachment_offsets):,} attachment adjustment(s)"
+            f"{len(plan.model_attachment_offsets):,} attachment adjustment(s) and "
+            f"{len(plan.model_particle_bridges):,} particle-body bridge(s)"
         ),
     )
 
@@ -319,7 +329,13 @@ def _build_cosmetics_unlocked(
     model_patcher: Optional[Path] = None
     composition_targets = len(plan.model_compositions)
     attachment_offset_targets = len(plan.model_attachment_offsets)
-    if group_patch_targets or composition_targets or attachment_offset_targets:
+    particle_bridge_targets = len(plan.model_particle_bridges)
+    if (
+        group_patch_targets
+        or composition_targets
+        or attachment_offset_targets
+        or particle_bridge_targets
+    ):
         model_patcher = find_model_patcher()
         validate_model_patcher(model_patcher)
     if group_patch_targets:
@@ -334,6 +350,10 @@ def _build_cosmetics_unlocked(
     if attachment_offset_targets:
         progress(
             f"Preparing {attachment_offset_targets} reviewed attachment adjustment(s)."
+        )
+    if particle_bridge_targets:
+        progress(
+            f"Preparing {particle_bridge_targets} reviewed particle-body bridge(s)."
         )
     preserved_skin_models = plan.stats.get("alternate_skin_models_skipped", 0)
     if preserved_skin_models:

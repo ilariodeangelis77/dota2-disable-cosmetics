@@ -79,6 +79,12 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
             "particle_defaults_resolved_transitively"
         ],
         "particle_resolution_cycles": counters["particle_resolution_cycles"],
+        "particle_body_bridges_planned": counters[
+            "particle_body_bridges_planned"
+        ],
+        "particle_body_bridges_preserved": counters[
+            "particle_body_bridges_preserved"
+        ],
         "particle_missing_defaults_hidden": 0,
         "particle_virtual_defaults_neutralized": 0,
         "particle_unknown_defaults_neutralized": 0,
@@ -153,6 +159,10 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         model_attachment_offsets=sorted(
             context.model_attachment_offsets,
             key=lambda adjustment: (adjustment.target, adjustment.source),
+        ),
+        model_particle_bridges=sorted(
+            context.model_particle_bridges,
+            key=lambda bridge: (bridge.target, bridge.source_model),
         ),
     )
 
