@@ -308,6 +308,7 @@ def deploy_overrides(
     ] = []
     ready_composition_targets: set[str] = set()
     ready_attachment_offset_targets: set[str] = set()
+    ready_particle_bridge_targets: set[str] = set()
 
     def record_missing(
         source: str,
@@ -356,6 +357,7 @@ def deploy_overrides(
         attachment_offset_targets.add(target_relative)
 
     particle_bridge_targets: set[str] = set()
+    required_particle_bridge_targets: set[str] = set()
     for bridge in plan.model_particle_bridges:
         target_relative = compiled_model_path(bridge.target)
         if target_relative in particle_bridge_targets:
@@ -368,6 +370,8 @@ def deploy_overrides(
                 f"transformation: {bridge.target}"
             )
         particle_bridge_targets.add(target_relative)
+        if bridge.required_for_model:
+            required_particle_bridge_targets.add(target_relative)
 
     required_groups_by_target = {
         compiled_model_path(mapping.target): mapping.required_material_groups
@@ -452,6 +456,7 @@ def deploy_overrides(
                     required_groups_by_target.get(target_relative, 1),
                 )
             )
+            ready_particle_bridge_targets.add(target_relative)
         completed = len(plan.model_attachment_offsets) + index
         deployment_progress.work(
             "staging",
@@ -533,7 +538,8 @@ def deploy_overrides(
         if (
             target_relative in ready_composition_targets
             or target_relative in ready_attachment_offset_targets
-            or target_relative in particle_bridge_targets
+            or target_relative in ready_particle_bridge_targets
+            or target_relative in required_particle_bridge_targets
         ):
             deployment_progress.work(
                 "staging",
@@ -695,7 +701,7 @@ def deploy_overrides(
             len(attachment_offset_jobs) + index,
             model_work_total,
             (
-                "Restoring particle-bodied heroes "
+                "Restoring model particle bridges "
                 f"({index:,} of {len(particle_bridge_jobs):,})"
             ),
         )

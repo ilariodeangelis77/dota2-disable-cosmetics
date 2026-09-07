@@ -107,6 +107,7 @@ class ModelParticleBridge:
     item_id: str
     hero: str
     slot: str
+    required_for_model: bool = True
 
 
 @dataclass

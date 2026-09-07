@@ -25,8 +25,8 @@ from ..resources import (
 )
 
 
-def _preserve_unavailable_particle_bodies(plan: Plan, cache: Path) -> Plan:
-    """Drop a compound bridge completely when any required source is unavailable."""
+def _discard_unavailable_model_particle_bridges(plan: Plan, cache: Path) -> Plan:
+    """Drop unavailable bridges while retaining safe direct-model fallbacks."""
 
     unavailable = []
     retained = []
@@ -50,7 +50,9 @@ def _preserve_unavailable_particle_bodies(plan: Plan, cache: Path) -> Plan:
         return plan
 
     blocked_model_targets = {
-        canonical(bridge.target) for bridge, _missing in unavailable
+        canonical(bridge.target)
+        for bridge, _missing in unavailable
+        if bridge.required_for_model
     }
     blocked_particle_targets = {
         canonical(bridge.private_particle) for bridge, _missing in unavailable
@@ -69,17 +71,24 @@ def _preserve_unavailable_particle_bodies(plan: Plan, cache: Path) -> Plan:
     ]
     unresolved = list(plan.unresolved)
     for bridge, missing in unavailable:
+        bridge_kind = (
+            "particle_body_bridge"
+            if bridge.required_for_model
+            else "model_particle_supplement"
+        )
         unresolved.append(
             {
                 "item_id": bridge.item_id,
                 "hero": bridge.hero,
                 "slot": bridge.slot,
-                "type": "particle_body_bridge",
+                "type": bridge_kind,
                 "target": bridge.target,
                 "missing_sources": missing,
                 "reason": (
                     "particle-bodied cosmetic preserved because a reviewed bridge "
                     "source is unavailable"
+                    if bridge.required_for_model
+                    else "model particle supplement skipped because a source is unavailable"
                 ),
             }
         )
@@ -110,13 +119,27 @@ def _preserve_unavailable_particle_bodies(plan: Plan, cache: Path) -> Plan:
                 {mapping.source for mapping in snapshot_mappings}
             ),
             "unresolved": len(unresolved),
-            "particle_body_bridges_planned": len(retained),
+            "particle_body_bridges_planned": sum(
+                bridge.required_for_model for bridge in retained
+            ),
             "particle_body_bridges_preserved": (
-                stats.get("particle_body_bridges_preserved", 0) + len(unavailable)
+                stats.get("particle_body_bridges_preserved", 0)
+                + sum(bridge.required_for_model for bridge, _missing in unavailable)
+            ),
+            "model_particle_supplements_planned": sum(
+                not bridge.required_for_model for bridge in retained
+            ),
+            "model_particle_supplements_skipped": (
+                stats.get("model_particle_supplements_skipped", 0)
+                + sum(
+                    not bridge.required_for_model
+                    for bridge, _missing in unavailable
+                )
             ),
             "full_hero_wearable_fallbacks": max(
                 0,
-                stats.get("full_hero_wearable_fallbacks", 0) - len(unavailable),
+                stats.get("full_hero_wearable_fallbacks", 0)
+                - sum(bridge.required_for_model for bridge, _missing in unavailable),
             ),
         }
     )
@@ -141,7 +164,7 @@ def apply_missing_particle_fallbacks(
 ) -> Plan:
     """Use Dota's null particle when a schema-referenced default no longer exists."""
 
-    plan = _preserve_unavailable_particle_bodies(plan, cache)
+    plan = _discard_unavailable_model_particle_bridges(plan, cache)
     neutral_compiled = compiled_particle_path(NEUTRAL_PARTICLE)
     neutral_source = path_under(cache, neutral_compiled)
     if not neutral_source.is_file():

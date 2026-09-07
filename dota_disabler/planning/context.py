@@ -86,6 +86,8 @@ COUNTER_NAMES = (
     "particle_resolution_cycles",
     "particle_body_bridges_planned",
     "particle_body_bridges_preserved",
+    "model_particle_supplements_planned",
+    "model_particle_supplements_skipped",
 )
 
 

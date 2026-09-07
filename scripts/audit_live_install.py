@@ -37,7 +37,10 @@ from dota_disabler.model_patcher import (
     validate_model_patcher,
 )
 from dota_disabler.planning import apply_missing_particle_fallbacks, apply_model_skin_material_fallbacks
-from dota_disabler.planning.particle_bodies import PARTICLE_BODY_PROFILES
+from dota_disabler.planning.particle_bodies import (
+    PARTICLE_BODY_PROFILES,
+    PARTICLE_SUPPLEMENT_PROFILES,
+)
 from dota_disabler.reporting import write_plan
 from dota_disabler.resources import (
     compiled_material_path,
@@ -170,6 +173,23 @@ def audit_live_install(
             raise RuntimeError(
                 "Reviewed particle-body bridge(s) were not planned: "
                 + ", ".join(missing_particle_body_bridges)
+            )
+
+        expected_supplement_items = set(PARTICLE_SUPPLEMENT_PROFILES).intersection(
+            item_records
+        )
+        planned_supplement_items = {
+            bridge.item_id
+            for bridge in plan.model_particle_bridges
+            if not bridge.required_for_model
+        }
+        missing_supplements = sorted(
+            expected_supplement_items - planned_supplement_items
+        )
+        if missing_supplements:
+            raise RuntimeError(
+                "Reviewed model-particle supplement(s) were not planned: "
+                + ", ".join(missing_supplements)
             )
 
         missing_sources = sorted(

@@ -12,7 +12,12 @@ from ..constants import (
     RESOURCE_PARTICLE,
 )
 from ..domain import ModelParticleBridge
-from ..resources import canonical, looks_like_model, looks_like_particle
+from ..resources import (
+    canonical,
+    is_cosmetic_additive_particle,
+    looks_like_model,
+    looks_like_particle,
+)
 from .context import ItemPlanningState, PlanningContext
 
 
@@ -29,16 +34,33 @@ class ParticleBodyProfile:
     suppressed_particles: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ParticleSupplementProfile:
+    item_ids: frozenset[str]
+    hero: str
+    slot: str
+    source_model: str
+    default_particles: tuple[str, ...]
+
+
+# The helper copies only this reviewed model-key configuration shape; every bridge
+# substitutes its own private particle path and retains the selected base model payload.
+PARTICLE_CONFIG_TEMPLATE_MODEL = (
+    "models/items/io/dark_carnival_io/dark_carnival_io.vmdl"
+)
+PARTICLE_CONFIG_TEMPLATE_PARTICLE = (
+    "particles/econ/items/wisp/io_carnival/io_carnival_ambient.vpcf"
+)
+
+
 MADAME_SCRIO = ParticleBodyProfile(
     item_id="34398",
     hero="npc_dota_hero_wisp",
     slot="head",
-    model_target="models/items/io/dark_carnival_io/dark_carnival_io.vmdl",
+    model_target=PARTICLE_CONFIG_TEMPLATE_MODEL,
     default_particle_slot="ambient_effects",
     source_particle="particles/units/heroes/hero_wisp/wisp_ambient.vpcf",
-    template_particle=(
-        "particles/econ/items/wisp/io_carnival/io_carnival_ambient.vpcf"
-    ),
+    template_particle=PARTICLE_CONFIG_TEMPLATE_PARTICLE,
     private_particle=(
         "particles/dota2_cosmetic_disabler/heroes/wisp/"
         "wisp_ambient_34398.vpcf"
@@ -51,6 +73,37 @@ MADAME_SCRIO = ParticleBodyProfile(
 
 
 PARTICLE_BODY_PROFILES = {MADAME_SCRIO.item_id: MADAME_SCRIO}
+
+
+EMBER_PRIMARY_SWORD = ParticleSupplementProfile(
+    item_ids=frozenset({"6016", "7007", "7880", "8884", "13300", "13382"}),
+    hero="npc_dota_hero_ember_spirit",
+    slot="weapon",
+    source_model="models/heroes/ember_spirit/weapon1.vmdl",
+    default_particles=(
+        "particles/units/heroes/hero_ember_spirit/ember_spirit_ambient_sword_primary.vpcf",
+        "particles/units/heroes/hero_ember_spirit/ember_spirit_ambient_sword_primary_blade.vpcf",
+    ),
+)
+
+
+EMBER_OFFHAND_SWORD = ParticleSupplementProfile(
+    item_ids=frozenset({"6017", "7006", "7879", "8883", "13302", "13440"}),
+    hero="npc_dota_hero_ember_spirit",
+    slot="offhand_weapon",
+    source_model="models/heroes/ember_spirit/weapon2.vmdl",
+    default_particles=(
+        "particles/units/heroes/hero_ember_spirit/ember_spirit_ambient_sword_offhand.vpcf",
+        "particles/units/heroes/hero_ember_spirit/ember_spirit_ambient_sword_offhand_blade.vpcf",
+    ),
+)
+
+
+PARTICLE_SUPPLEMENT_PROFILES = {
+    item_id: profile
+    for profile in (EMBER_PRIMARY_SWORD, EMBER_OFFHAND_SWORD)
+    for item_id in profile.item_ids
+}
 
 
 def _profile_error(
@@ -181,9 +234,124 @@ def process_particle_body(
     return True
 
 
+def _supplement_error(
+    context: PlanningContext,
+    state: ItemPlanningState,
+    profile: ParticleSupplementProfile,
+) -> tuple[str, str, str]:
+    if state.hero != profile.hero or state.slot != profile.slot:
+        return "reviewed particle supplement moved to a different hero or slot", "", ""
+    if state.default_item is None:
+        return "reviewed particle supplement has no current default item", "", ""
+
+    source_model = context.default_model_for(state.default_item, "model_player")
+    if canonical(source_model or "") != canonical(profile.source_model):
+        return "reviewed particle supplement default model changed", "", ""
+
+    default_particles = tuple(
+        context.default_created_particles.get((profile.hero, profile.slot), [])
+    )
+    expected_particles = tuple(map(canonical, profile.default_particles))
+    if default_particles != expected_particles:
+        return "reviewed particle supplement default effects changed", "", ""
+
+    targets = [
+        canonical(model)
+        for key, model in state.item.top_models
+        if key == "model_player" and looks_like_model(model)
+    ]
+    if len(targets) != 1 or state.item.nested_models:
+        return "reviewed particle supplement model targets changed", "", ""
+
+    created_particles = [
+        canonical(target)
+        for visual in state.item.visuals
+        if visual.get("type") == "particle_create"
+        for target in (visual.get("modifier", "") or visual.get("asset", ""),)
+        if looks_like_particle(target)
+    ]
+    if len(created_particles) != 1 or not (
+        created_particles[0] == expected_particles[0]
+        or is_cosmetic_additive_particle(created_particles[0])
+    ):
+        return "reviewed particle supplement cosmetic effects changed", "", ""
+
+    return "", targets[0], expected_particles[1]
+
+
+def process_model_particle_supplement(
+    context: PlanningContext,
+    state: ItemPlanningState,
+) -> None:
+    """Add a reviewed missing default effect to an otherwise ordinary model copy."""
+
+    profile = PARTICLE_SUPPLEMENT_PROFILES.get(state.item.item_id)
+    if profile is None or not {
+        CATEGORY_STANDARD_WEARABLES,
+        CATEGORY_PARTICLE_EFFECTS,
+    }.issubset(context.enabled):
+        return
+
+    error, target_model, source_particle = _supplement_error(
+        context,
+        state,
+        profile,
+    )
+    if error:
+        context.increment("model_particle_supplements_skipped")
+        context.unresolved.append(
+            {
+                "item_id": state.item.item_id,
+                "hero": state.hero,
+                "slot": state.slot,
+                "type": "model_particle_supplement",
+                "target": target_model or canonical(profile.source_model),
+                "reason": error,
+            }
+        )
+        return
+
+    particle_stem = source_particle.rsplit("/", 1)[-1].removesuffix(".vpcf")
+    private_particle = canonical(
+        "particles/dota2_cosmetic_disabler/heroes/ember_spirit/"
+        f"{state.item.item_id}_{particle_stem}.vpcf"
+    )
+    context.add_candidate(
+        source_particle,
+        private_particle,
+        "reviewed missing model-owned particle supplement",
+        state.item,
+        category=CATEGORY_PARTICLE_EFFECTS,
+        resource_type=RESOURCE_PARTICLE,
+        slot=state.slot,
+    )
+    context.model_particle_bridges.append(
+        ModelParticleBridge(
+            source_model=canonical(profile.source_model),
+            template_model=PARTICLE_CONFIG_TEMPLATE_MODEL,
+            target=target_model,
+            source_particle=source_particle,
+            private_particle=private_particle,
+            template_particle=PARTICLE_CONFIG_TEMPLATE_PARTICLE,
+            reason="reviewed default particle supplemented on replacement model",
+            category=CATEGORY_STANDARD_WEARABLES,
+            item_id=state.item.item_id,
+            hero=profile.hero,
+            slot=profile.slot,
+            required_for_model=False,
+        )
+    )
+    context.increment("model_particle_supplements_planned")
+
+
 __all__ = [
     "MADAME_SCRIO",
+    "EMBER_OFFHAND_SWORD",
+    "EMBER_PRIMARY_SWORD",
     "PARTICLE_BODY_PROFILES",
+    "PARTICLE_SUPPLEMENT_PROFILES",
+    "ParticleSupplementProfile",
     "ParticleBodyProfile",
     "process_particle_body",
+    "process_model_particle_supplement",
 ]

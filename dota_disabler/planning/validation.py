@@ -85,6 +85,12 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         "particle_body_bridges_preserved": counters[
             "particle_body_bridges_preserved"
         ],
+        "model_particle_supplements_planned": counters[
+            "model_particle_supplements_planned"
+        ],
+        "model_particle_supplements_skipped": counters[
+            "model_particle_supplements_skipped"
+        ],
         "particle_missing_defaults_hidden": 0,
         "particle_virtual_defaults_neutralized": 0,
         "particle_unknown_defaults_neutralized": 0,

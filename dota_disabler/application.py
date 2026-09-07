@@ -289,7 +289,7 @@ def _build_cosmetics_unlocked(
             f"Planned {len(plan.mappings):,} replacement mapping(s) and "
             f"{len(plan.model_compositions):,} model composition(s), plus "
             f"{len(plan.model_attachment_offsets):,} attachment adjustment(s) and "
-            f"{len(plan.model_particle_bridges):,} particle-body bridge(s)"
+            f"{len(plan.model_particle_bridges):,} model-particle bridge(s)"
         ),
     )
 
@@ -353,7 +353,7 @@ def _build_cosmetics_unlocked(
         )
     if particle_bridge_targets:
         progress(
-            f"Preparing {particle_bridge_targets} reviewed particle-body bridge(s)."
+            f"Preparing {particle_bridge_targets} reviewed model-particle bridge(s)."
         )
     preserved_skin_models = plan.stats.get("alternate_skin_models_skipped", 0)
     if preserved_skin_models:

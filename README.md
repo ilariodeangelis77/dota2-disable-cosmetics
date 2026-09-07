@@ -138,7 +138,7 @@ is disabled during those operations so their presentation cannot change midway t
 | Wearables and attachments | Normal and alternate-style `model_player` resources, integrated-slot items, bodygroup-sensitive compatibility models, and `additional_wearable` attachments. |
 | Hero transformations | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, model-to-model, pet, summon, ward, and similar special-model rules. |
 | Personas — experimental | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. This remains independently selectable because its coverage has more known edge cases. |
-| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, particle snapshots, and reviewed particle-bodied hero restoration. |
+| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, particle snapshots, reviewed particle-bodied hero restoration, and reviewed missing model-particle supplements. |
 
 Where applicable, selected model categories also restore confidently matched material variants and
 add compatible base-material groups to copied default models.
@@ -154,6 +154,12 @@ model keeps base Io's geometry and adds the normal ambient through a private mod
 path that Madame Scrio's suppression rule cannot redirect to Dota's null effect. If either half of
 that bridge is unavailable, the patcher leaves Madame Scrio unchanged instead of producing an empty
 Io.
+
+Ember Spirit's normal swords each use an ambient particle and a separate blade particle. Twelve
+reviewed weapon cosmetics declare only one effective normal component after their model is replaced.
+For those targets, the patcher keeps the ordinary model, particle, and snapshot restoration and adds
+only the missing normal blade through a private model-owned path. If that optional supplement is
+unavailable, the direct default-weapon model replacement remains usable.
 
 ### Known limitations
 
@@ -336,12 +342,12 @@ Every release is checked at three levels:
 3. **In-game checks** confirm representative heroes, effects, and reviewed Persona bridges in the
    Armory, Demo Hero, or a custom lobby.
 
-The latest full audit packed, reopened, and CRC-validated **16,490 generated resources** with no
+The latest full audit packed, reopened, and CRC-validated **16,502 generated resources** with no
 missing final sources.
 
-Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, Madame Scrio, and the
-Morphling, Oracle, Axe, Legion Commander, and Bristleback Automatons. Dota updates can change
-resources or rendering behavior, so verify a new build before using it in normal play.
+Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, Madame Scrio, Ember Spirit,
+and the Morphling, Oracle, Axe, Legion Commander, and Bristleback Automatons. Dota updates can
+change resources or rendering behavior, so verify a new build before using it in normal play.
 
 ## Development
 

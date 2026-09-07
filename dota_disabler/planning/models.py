@@ -13,7 +13,10 @@ from ..constants import (
 from ..domain import ItemRecord
 from ..resources import canonical, looks_like_model
 from .context import ItemPlanningState, PendingModelOverride, PlanningContext
-from .particle_bodies import process_particle_body
+from .particle_bodies import (
+    process_model_particle_supplement,
+    process_particle_body,
+)
 
 
 def _wearable_source(
@@ -331,6 +334,7 @@ def process_item_models(
     state = context.state_for(item)
     if not process_particle_body(context, state):
         _add_wearable_models(context, state)
+        process_model_particle_supplement(context, state)
     if state.is_base:
         if context.has_reviewed_persona_base_visual_slot(state.hero, state.slot):
             for visual in item.visuals:
