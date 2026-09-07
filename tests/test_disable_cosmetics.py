@@ -5841,8 +5841,11 @@ class VpkExtractorIntegrationTests(unittest.TestCase):
             (hero_demo / "addon_french.txt").write_bytes(b"French Hero Demo")
 
             staging = root / "staging"
+            alias_parent = root / "path-alias"
+            alias_parent.mkdir()
+            dota_alias = alias_parent / ".." / "dota 2 beta"
             core_support = generator.stage_core_language_support(
-                dota,
+                dota_alias,
                 staging,
                 "dutch",
                 "french",

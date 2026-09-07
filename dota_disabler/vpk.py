@@ -421,7 +421,8 @@ def stage_core_language_support(
         if not source_root_path.is_dir():
             continue
         for english_source in source_root_path.rglob("*_english.txt"):
-            english_relative = canonical(english_source.relative_to(core).as_posix())
+            source_relative = english_source.relative_to(source_root_path).as_posix()
+            english_relative = canonical(f"{relative_root}/{source_relative}")
             target_relative = _localized_resource_target(
                 english_relative,
                 "english",
