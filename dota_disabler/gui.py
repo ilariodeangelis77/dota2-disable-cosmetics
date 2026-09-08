@@ -333,6 +333,7 @@ class DisablerApp:
         self.last_status: Optional[dict] = None
         self._configure_root()
         self._build_layout()
+        self._stabilize_workspace_geometry()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.after(80, self._drain_events)
         if start_detection:
@@ -747,6 +748,7 @@ class DisablerApp:
             pady=5,
             font=FONT_BODY_SMALL,
             wraplength=360,
+            width=1,
         )
         self.status_detail.grid(row=5, column=0, sticky="ew", padx=18, pady=(8, 10))
         self._set_translated_text(
@@ -848,6 +850,7 @@ class DisablerApp:
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_columnconfigure(1, weight=1)
         self.action_card = border
+        self.action_panel = panel
 
         self.action_summary = tk.Label(
             panel,
@@ -877,6 +880,7 @@ class DisablerApp:
             compact=True,
         )
         self.build_button.grid(row=1, column=1, sticky="ew", padx=(4, 14), pady=(0, 8))
+        self.build_button.configure(width=1)
         self._set_translated_text(self.build_button, "Build Overrides")
         self.busy_controls.extend((self.clean_button, self.build_button))
         self._update_action_summary()
@@ -892,14 +896,20 @@ class DisablerApp:
         activity_header = tk.Frame(panel, bg=SURFACE)
         activity_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(10, 6))
         activity_header.grid_columnconfigure(0, weight=1)
+        self.activity_header = activity_header
+        # Reserve stable slots for both labels. Otherwise each new phase and
+        # percentage changes this header's requested width, which makes grid
+        # redistribute the controls and activity panes throughout a build.
         self.activity_title = tk.Label(
             activity_header,
             text="",
             bg=SURFACE,
             fg=TEXT_SOFT,
             font=FONT_BOLD,
+            anchor="w",
+            width=1,
         )
-        self.activity_title.grid(row=0, column=0, sticky="w")
+        self.activity_title.grid(row=0, column=0, sticky="ew")
         self._set_translated_text(self.activity_title, "Current activity")
         self.progress_label = tk.Label(
             activity_header,
@@ -907,6 +917,8 @@ class DisablerApp:
             bg=SURFACE,
             fg=TEXT_SOFT,
             font=FONT_BOLD_SMALL,
+            anchor="e",
+            width=6,
         )
         self.progress_label.grid(row=0, column=1, padx=(8, 4))
         self.result_actions = tk.Frame(activity_header, bg=SURFACE)
@@ -993,6 +1005,71 @@ class DisablerApp:
         )
         self._append_log(self._tr("Ready. Dota will be detected automatically."))
 
+    def _stabilize_workspace_geometry(self) -> None:
+        """Keep dynamic status and result copy from moving the workspace panes."""
+        self.controls_column.grid_propagate(True)
+        self.root.update_idletasks()
+
+        def horizontal_padding(value: object) -> int:
+            values = (
+                value
+                if isinstance(value, (tuple, list))
+                else self.root.tk.splitlist(value)
+            )
+            return sum(self.root.winfo_pixels(str(part)) for part in values)
+
+        status_states = (
+            "not_built",
+            "current",
+            "stale",
+            "legacy",
+            "broken",
+            "unknown",
+        )
+        action_labels = [
+            status_presentation({"status": state}, None, self._tr)["action"]
+            for state in status_states
+        ]
+        action_labels.append(
+            status_presentation(
+                {"status": "current", "enabled_categories": []},
+                {"layout-probe"},
+                self._tr,
+            )["action"]
+        )
+        button_padding = 2 * self.root.winfo_pixels(
+            str(self.build_button.cget("padx"))
+        )
+        button_grid_padding = horizontal_padding(
+            self.build_button.grid_info().get("padx", 0)
+        )
+        widest_action = max(
+            self.fonts[FONT_BOLD].measure(label) for label in action_labels
+        )
+        self.action_panel.grid_columnconfigure(
+            1,
+            minsize=widest_action + button_padding + button_grid_padding,
+        )
+
+        self.root.update_idletasks()
+        progress_width = self.progress_label.winfo_reqwidth() + horizontal_padding(
+            self.progress_label.grid_info().get("padx", 0)
+        )
+        self.activity_header.grid_columnconfigure(
+            0,
+            minsize=max(1, self.result_actions.winfo_reqwidth() - progress_width),
+        )
+
+        self.root.update_idletasks()
+        requested_width = self.controls_column.winfo_reqwidth()
+        requested_height = self.controls_column.winfo_reqheight()
+        self.controls_column.configure(
+            width=requested_width,
+            height=requested_height,
+        )
+        self.controls_column.grid_propagate(False)
+        self.root.update_idletasks()
+
     def _selected_categories(self) -> set[str]:
         return {
             category
@@ -1040,7 +1117,7 @@ class DisablerApp:
         self._update_action_summary()
         if self.last_status is not None:
             self._apply_status(self.last_status)
-        self.root.update_idletasks()
+        self._stabilize_workspace_geometry()
 
     def _apply_ui_locale(self, selected: str, *, persist: bool = True) -> bool:
         if self.busy or self._applying_ui_locale or selected == self.ui_locale:
@@ -1902,24 +1979,121 @@ def run_gui(*, smoke_test: bool = False) -> int:
             raise RuntimeError("GUI activity log was not persistently displayed.")
         if app.result_actions.grid_info():
             raise RuntimeError("GUI result actions appeared without a usable result.")
+        stable_workspace_geometry = (
+            app.controls_column.winfo_x(),
+            app.controls_column.winfo_width(),
+            app.activity_card.winfo_x(),
+            app.activity_card.winfo_width(),
+        )
         app._set_result_actions_visible(True)
+        root.update_idletasks()
         if not app.result_actions.grid_info():
             raise RuntimeError("GUI result actions could not be revealed contextually.")
+        if (
+            app.controls_column.winfo_x(),
+            app.controls_column.winfo_width(),
+            app.activity_card.winfo_x(),
+            app.activity_card.winfo_width(),
+        ) != stable_workspace_geometry:
+            raise RuntimeError("GUI result actions shifted the workspace panes.")
         if app.copy_launch_button.grid_info().get("row") != 1:
             raise RuntimeError("GUI result actions do not wrap at minimum width.")
-        root.update_idletasks()
+        stable_result_position = (
+            app.open_report_button.winfo_rootx(),
+            app.open_report_button.winfo_rooty(),
+            app.open_output_button.winfo_rootx(),
+            app.open_output_button.winfo_rooty(),
+            app.copy_launch_button.winfo_rootx(),
+            app.copy_launch_button.winfo_rooty(),
+        )
         _assert_localized_layout(app)
         app._set_busy(True, "Packing files")
+        root.update_idletasks()
         if str(app.ui_locale_combo.cget("state")) != "disabled":
             raise RuntimeError("GUI language selector stayed enabled during an operation.")
-        app._set_progress(42.5, "Packing files")
-        if str(app.activity_title.cget("text")) != "Packing files":
-            raise RuntimeError("GUI activity copy was unexpectedly transformed.")
-        if str(app.progress_label.cget("text")) != "42.5%":
-            raise RuntimeError("GUI progress label did not preserve granular progress.")
+        stable_progress_geometry = (
+            root.winfo_width(),
+            root.winfo_height(),
+            app.controls_column.winfo_width(),
+            app.activity_card.winfo_width(),
+            app.activity_title.winfo_reqwidth(),
+            app.progress_label.winfo_reqwidth(),
+        )
+        for percent, message, expected_label in (
+            (9.9, "Packing files", "9.9%"),
+            (
+                10.0,
+                "Extracting replacement resources (1 of 16,502)",
+                "10.0%",
+            ),
+            (42.5, "Packing files", "42.5%"),
+            (
+                88.8,
+                "Checking default-model material groups (1,061 of 1,061)",
+                "88.8%",
+            ),
+            (100.0, "Build complete", "100%"),
+        ):
+            app._set_progress(percent, message)
+            root.update_idletasks()
+            if str(app.activity_title.cget("text")) != message:
+                raise RuntimeError("GUI activity copy was unexpectedly transformed.")
+            if str(app.progress_label.cget("text")) != expected_label:
+                raise RuntimeError("GUI progress label did not preserve granular progress.")
+            current_progress_geometry = (
+                root.winfo_width(),
+                root.winfo_height(),
+                app.controls_column.winfo_width(),
+                app.activity_card.winfo_width(),
+                app.activity_title.winfo_reqwidth(),
+                app.progress_label.winfo_reqwidth(),
+            )
+            if current_progress_geometry != stable_progress_geometry:
+                raise RuntimeError(
+                    "GUI layout shifted while progress text was changing: "
+                    f"expected {stable_progress_geometry}, got {current_progress_geometry}"
+                )
         app._set_busy(False)
         if str(app.ui_locale_combo.cget("state")) != "readonly":
             raise RuntimeError("GUI language selector did not return to readonly state.")
+        for state in ("not_built", "current", "stale", "legacy", "broken", "unknown"):
+            app._apply_status(
+                {
+                    "status": state,
+                    "enabled_categories": sorted(app._selected_categories()),
+                    "language": app._selected_language(),
+                    "current_dota_version": {"steam_build_id": "25132749"},
+                    "recorded_dota_version": {"steam_build_id": "25132749"},
+                }
+            )
+            root.update_idletasks()
+            if (
+                app.controls_column.winfo_x(),
+                app.controls_column.winfo_width(),
+                app.activity_card.winfo_x(),
+                app.activity_card.winfo_width(),
+            ) != stable_workspace_geometry:
+                raise RuntimeError(
+                    f"GUI workspace shifted while applying the {state} status."
+                )
+            if state == "not_built":
+                if app.result_actions.grid_info():
+                    raise RuntimeError("GUI result actions remained visible without a result.")
+            else:
+                if not app.result_actions.grid_info():
+                    raise RuntimeError("GUI result actions disappeared for a usable result.")
+                if (
+                    app.open_report_button.winfo_rootx(),
+                    app.open_report_button.winfo_rooty(),
+                    app.open_output_button.winfo_rootx(),
+                    app.open_output_button.winfo_rooty(),
+                    app.copy_launch_button.winfo_rootx(),
+                    app.copy_launch_button.winfo_rooty(),
+                ) != stable_result_position:
+                    raise RuntimeError(
+                        f"GUI result actions shifted while applying the {state} status."
+                    )
+            _assert_localized_layout(app)
         _assert_live_locale_switches(app)
         root.withdraw()
         root.destroy()
