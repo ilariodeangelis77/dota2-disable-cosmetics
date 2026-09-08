@@ -557,6 +557,8 @@ class DisablerApp:
             bg=BG,
             fg=MUTED,
             font=FONT_CAPTION,
+            justify="right",
+            wraplength=90,
         )
         self.ui_locale_label.grid(row=0, column=0, sticky="e", padx=(0, 7))
         self._set_translated_text(self.ui_locale_label, "GUI language")
