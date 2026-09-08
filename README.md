@@ -135,31 +135,18 @@ is disabled during those operations so their presentation cannot change midway t
 
 | Category | Current coverage |
 | --- | --- |
-| Wearables and attachments | Normal and alternate-style `model_player` resources, integrated-slot items, bodygroup-sensitive compatibility models, and `additional_wearable` attachments. |
-| Hero transformations | Schema-driven `entity_model`, `base_model`, `entity_clientside_model`, `hero_model_change`, model-to-model, pet, summon, ward, and similar special-model rules. |
-| Personas — experimental | Persona wearables that can be restored safely, with invisible fallbacks when a normal-hero attachment would be incompatible. This remains independently selectable because its coverage has more known edge cases. |
-| Particles and effects | Declared particle replacements, cosmetic particle additions with a safe inferred default, particle snapshots, reviewed particle-bodied hero restoration, and reviewed missing model-particle supplements. |
+| Wearables and attachments | Cosmetic models, alternate styles, integrated-slot items, bodygroup-sensitive models, and additional wearable attachments. |
+| Hero transformations | Hero model changes, alternate forms, pets, summons, wards, and similar schema-defined model replacements. |
+| Personas — experimental | Persona models and compatible wearables that can be restored safely. Unsupported attachments are hidden when retaining them would produce an invalid result. |
+| Particles and effects | Declared particle replacements, cosmetic particle additions, particle snapshots, and other reviewed effect restorations. |
 
 Where applicable, selected model categories also restore confidently matched material variants and
 add compatible base-material groups to copied default models.
 
-Mappings are derived from schema mechanics rather than cosmetic names. Some Arcana parts therefore
+Mappings are derived from schema behavior rather than cosmetic names. An Arcana part may therefore
 belong to **Wearables and attachments**, while a transformation and its related attachments remain
-together under **Hero transformations** or **Personas**. The dashboard groups five internal planner
-categories into these four user-facing choices; the CLI retains the detailed category names.
-
-Madame Scrio uses a reviewed compound restoration because Io's readable body is a particle effect.
-When both **Wearables and attachments** and **Particles and effects** are selected, the generated
-model keeps base Io's geometry and adds the normal ambient through a private model-owned particle
-path that Madame Scrio's suppression rule cannot redirect to Dota's null effect. If either half of
-that bridge is unavailable, the patcher leaves Madame Scrio unchanged instead of producing an empty
-Io.
-
-Ember Spirit's normal swords each use an ambient particle and a separate blade particle. Twelve
-reviewed weapon cosmetics declare only one effective normal component after their model is replaced.
-For those targets, the patcher keeps the ordinary model, particle, and snapshot restoration and adds
-only the missing normal blade through a private model-owned path. If that optional supplement is
-unavailable, the direct default-weapon model replacement remains usable.
+together under **Hero transformations** or **Personas**. The dashboard presents four choices; the
+CLI retains the more detailed internal category names.
 
 ### Known limitations
 
@@ -357,9 +344,9 @@ Every release is checked at three levels:
 The latest full audit packed, reopened, and CRC-validated **16,502 generated resources** with no
 missing final sources.
 
-Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, Madame Scrio, Ember Spirit,
-and the Morphling, Oracle, Axe, Legion Commander, and Bristleback Automatons. Dota updates can
-change resources or rendering behavior, so verify a new build before using it in normal play.
+Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, and the Morphling, Oracle,
+Axe, Legion Commander, and Bristleback Automatons. Dota updates can change resources or rendering
+behavior, so verify a new build before using it in normal play.
 
 ## Development
 
