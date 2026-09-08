@@ -530,16 +530,11 @@ class DisablerApp:
             bg=SURFACE_ALT,
             fg=TEXT_SOFT,
             font=FONT_BOLD_SMALL,
-            padx=9,
+            padx=7,
             pady=6,
         )
-        self.header_status.grid(row=0, column=3, sticky="e", padx=(10, 0))
-        self._set_translated_text(
-            self.header_status,
-            "DETECTING",
-            prefix="  ",
-            suffix="  ",
-        )
+        self.header_status.grid(row=0, column=3, sticky="ew", padx=(8, 0))
+        self._set_translated_text(self.header_status, "DETECTING")
         self.refresh_button = FlatButton(
             header,
             text="",
@@ -1026,16 +1021,48 @@ class DisablerApp:
             "broken",
             "unknown",
         )
-        action_labels = [
-            status_presentation({"status": state}, None, self._tr)["action"]
+        status_views = [
+            status_presentation({"status": state}, None, self._tr)
             for state in status_states
         ]
-        action_labels.append(
+        status_views.append(
             status_presentation(
                 {"status": "current", "enabled_categories": []},
                 {"layout-probe"},
                 self._tr,
-            )["action"]
+            )
+        )
+        action_labels = [view["action"] for view in status_views]
+        header_status_labels = [
+            self._tr(message)
+            for message in (
+                "DETECTING",
+                "CHECKING MOUNT",
+                "CHECK PATH",
+                "UI ERROR",
+                "ACTION NEEDED",
+            )
+        ]
+        header_status_labels.extend(view["badge"] for view in status_views)
+        current_header_text = str(self.header_status.cget("text"))
+        header_status_chrome = max(
+            0,
+            self.header_status.winfo_reqwidth()
+            - self.fonts[FONT_BOLD_SMALL].measure(current_header_text),
+        )
+        header_status_grid_padding = horizontal_padding(
+            self.header_status.grid_info().get("padx", 0)
+        )
+        self.header.grid_columnconfigure(
+            3,
+            minsize=(
+                max(
+                    self.fonts[FONT_BOLD_SMALL].measure(label)
+                    for label in header_status_labels
+                )
+                + header_status_chrome
+                + header_status_grid_padding
+            ),
         )
         button_padding = 2 * self.root.winfo_pixels(
             str(self.build_button.cget("padx"))
@@ -1209,12 +1236,7 @@ class DisablerApp:
         self._update_action_summary()
         self._set_result_actions_visible(False)
         self.header_status.configure(fg=BLUE, bg=SURFACE_ALT)
-        self._set_translated_text(
-            self.header_status,
-            "CHECKING MOUNT",
-            prefix="  ",
-            suffix="  ",
-        )
+        self._set_translated_text(self.header_status, "CHECKING MOUNT")
         self.status_detail.configure(fg=BLUE)
         self._set_translated_text(
             self.status_detail,
@@ -1235,12 +1257,7 @@ class DisablerApp:
         self._set_translated_text(self.build_button, "Build Overrides")
         self._set_result_actions_visible(False)
         self.header_status.configure(fg=AMBER, bg=SURFACE_ALT)
-        self._set_translated_text(
-            self.header_status,
-            "CHECK PATH",
-            prefix="  ",
-            suffix="  ",
-        )
+        self._set_translated_text(self.header_status, "CHECK PATH")
         self.status_detail.configure(fg=AMBER)
         self._set_translated_text(
             self.status_detail,
@@ -1430,12 +1447,7 @@ class DisablerApp:
                 except Exception as exc:
                     self._set_busy(False)
                     self.header_status.configure(fg=RED, bg="#321c22")
-                    self._set_translated_text(
-                        self.header_status,
-                        "UI ERROR",
-                        prefix="  ",
-                        suffix="  ",
-                    )
+                    self._set_translated_text(self.header_status, "UI ERROR")
                     self.status_detail.configure(fg=RED)
                     self._set_literal_text(self.status_detail, exc)
                     self._append_log(
@@ -1520,12 +1532,7 @@ class DisablerApp:
             self.last_status = None
             self._set_translated_text(self.build_button, "Build Overrides")
         self.header_status.configure(fg=RED, bg="#321c22")
-        self._set_translated_text(
-            self.header_status,
-            "ACTION NEEDED",
-            prefix="  ",
-            suffix="  ",
-        )
+        self._set_translated_text(self.header_status, "ACTION NEEDED")
         self.status_detail.configure(fg=RED)
         self._set_literal_text(self.status_detail, error)
         self._append_log(
@@ -1563,12 +1570,7 @@ class DisablerApp:
         self.last_status = None
         self._set_translated_text(self.build_button, "Build Overrides")
         self.header_status.configure(fg=RED, bg="#321c22")
-        self._set_translated_text(
-            self.header_status,
-            "ACTION NEEDED",
-            prefix="  ",
-            suffix="  ",
-        )
+        self._set_translated_text(self.header_status, "ACTION NEEDED")
         self.status_detail.configure(fg=RED)
 
         def render_detail() -> str:
@@ -1630,7 +1632,7 @@ class DisablerApp:
         if isinstance(language, str) and language in engine.RECOGNIZED_LANGUAGES:
             detail += f"  ·  -language {language}"
         self.header_status.configure(fg=view["color"], bg=SURFACE_ALT)
-        self._set_literal_text(self.header_status, f"  {view['badge']}  ")
+        self._set_literal_text(self.header_status, view["badge"])
         self.status_detail.configure(fg=view["color"])
         self._set_literal_text(self.status_detail, detail)
         self._set_literal_text(self.build_button, view["action"])
@@ -1985,6 +1987,14 @@ def run_gui(*, smoke_test: bool = False) -> int:
             app.activity_card.winfo_x(),
             app.activity_card.winfo_width(),
         )
+        stable_header_geometry = (
+            app.ui_locale_frame.winfo_rootx(),
+            app.ui_locale_frame.winfo_width(),
+            app.header_status.winfo_rootx(),
+            app.header_status.winfo_width(),
+            app.refresh_button.winfo_rootx(),
+            app.refresh_button.winfo_width(),
+        )
         app._set_result_actions_visible(True)
         root.update_idletasks()
         if not app.result_actions.grid_info():
@@ -2075,6 +2085,17 @@ def run_gui(*, smoke_test: bool = False) -> int:
             ) != stable_workspace_geometry:
                 raise RuntimeError(
                     f"GUI workspace shifted while applying the {state} status."
+                )
+            if (
+                app.ui_locale_frame.winfo_rootx(),
+                app.ui_locale_frame.winfo_width(),
+                app.header_status.winfo_rootx(),
+                app.header_status.winfo_width(),
+                app.refresh_button.winfo_rootx(),
+                app.refresh_button.winfo_width(),
+            ) != stable_header_geometry:
+                raise RuntimeError(
+                    f"GUI header shifted while applying the {state} status."
                 )
             if state == "not_built":
                 if app.result_actions.grid_info():
