@@ -46,6 +46,7 @@ class ArchitectureContractTests(unittest.TestCase):
             "reporting.py",
             "resources.py",
             "schema.py",
+            "schema_files.py",
             "versioning.py",
             "vpk.py",
             "application.py",

@@ -32,6 +32,13 @@ function Normalize-CatalogEnd {
     param([string]$Path)
 
     $content = [IO.File]::ReadAllText($Path)
+    # Babel update keeps the old PO project version; refresh it before compiling.
+    $projectHeader = '"Project-Id-Version: Dota 2 Cosmetic Disabler {0}\n"' -f $version
+    $content = [Text.RegularExpressions.Regex]::Replace(
+        $content,
+        '(?m)^"Project-Id-Version: [^"]*"$',
+        $projectHeader
+    )
     $content = [Text.RegularExpressions.Regex]::Replace(
         $content,
         '[\r\n\t ]+\z',

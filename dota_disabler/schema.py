@@ -9,13 +9,13 @@ from .constants import MODEL_KEYS
 from .domain import ItemRecord
 from .keyvalues import (
     KVObject,
-    TokenStream,
     as_str,
     obj_to_simple_dict,
     parse_value,
     skip_value,
 )
 from .resources import canonical, looks_like_model
+from .schema_files import schema_tokens
 
 
 def hero_from_item(item: KVObject) -> Optional[str]:
@@ -67,7 +67,7 @@ def visual_modifiers(obj: KVObject) -> list[dict[str, str]]:
 def load_items_game(
     path: Path,
 ) -> tuple[dict[str, dict[str, str]], dict[str, ItemRecord], list[dict[str, str]]]:
-    tokens = TokenStream(path.read_text(encoding="utf-8-sig", errors="replace"))
+    tokens = schema_tokens(path, "items_game")
     root_name = tokens.next()
     if root_name != "items_game":
         raise ValueError(f"Expected items_game root, got {root_name!r}")
@@ -166,7 +166,7 @@ def load_items_game(
 
 
 def load_hero_models(path: Path) -> dict[str, str]:
-    tokens = TokenStream(path.read_text(encoding="utf-8-sig", errors="replace"))
+    tokens = schema_tokens(path, "DOTAHeroes")
     root_name = tokens.next()
     if root_name != "DOTAHeroes":
         raise ValueError(f"Expected DOTAHeroes root, got {root_name!r}")
@@ -199,7 +199,7 @@ def load_hero_models(path: Path) -> dict[str, str]:
 def load_unit_models(path: Path) -> dict[str, str]:
     """Load default summon/ward models, including inherited unit definitions."""
 
-    tokens = TokenStream(path.read_text(encoding="utf-8-sig", errors="replace"))
+    tokens = schema_tokens(path, "DOTAUnits")
     root_name = tokens.next()
     if root_name != "DOTAUnits":
         raise ValueError(f"Expected DOTAUnits root, got {root_name!r}")

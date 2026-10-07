@@ -36,7 +36,7 @@ from .domain import (
 )
 from .errors import GeneratorError
 from .model_patcher import find_model_patcher, validate_model_patcher
-from .paths import application_root
+from .paths import application_root, path_under
 from .planning import (
     apply_missing_particle_fallbacks,
     apply_model_skin_material_fallbacks,
@@ -51,6 +51,7 @@ from .resources import (
     compiled_particle_path,
 )
 from .schema import load_hero_models, load_items_game, load_unit_models
+from .schema_files import MAX_SCHEMA_FILES, schema_base_files
 from .version import VERSION
 from .versioning import (
     capture_dota_version,
@@ -99,6 +100,34 @@ def load_or_extract_schema(
             "Schema extraction finished but items_game.txt, npc_heroes.txt, or npc_units.txt was not produced. "
             "The installed Dota VPK may have changed or be incomplete."
         )
+    # Every requested dependency is freshly extracted, even when an older build
+    # left a file in the cache. Removed VPK entries must never survive as defaults.
+    scanned = {items.resolve(), heroes.resolve(), units.resolve()}
+    pending = set(scanned)
+    while pending:
+        dependencies = {
+            dependency
+            for path in sorted(pending)
+            for dependency in schema_base_files(path, cache)
+        } - scanned
+        if not dependencies:
+            break
+        if len(scanned) + len(dependencies) > MAX_SCHEMA_FILES:
+            raise ValueError(f"Schema #base dependencies exceed {MAX_SCHEMA_FILES} files.")
+        resources = sorted(
+            dependency.relative_to(cache.resolve()).as_posix().lower()
+            for dependency in dependencies
+        )
+        progress(f"Extracting {len(resources)} referenced schema #base file(s)...")
+        extract_vpk(
+            extractor, pak, resources, cache,
+            progress=progress, progress_update=progress_update,
+        )
+        pending = {path_under(cache, resource) for resource in resources}
+        for path in pending:
+            if not path.is_file():
+                raise FileNotFoundError(f"Required schema #base file was not found in Dota's VPK: {path}")
+        scanned.update(pending)
     return items, heroes, units
 
 

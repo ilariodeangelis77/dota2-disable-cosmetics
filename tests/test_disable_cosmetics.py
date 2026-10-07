@@ -5601,6 +5601,59 @@ class DeploymentTests(unittest.TestCase):
 
 
 class VpkExtractorIntegrationTests(unittest.TestCase):
+    def test_schema_extraction_refreshes_nested_base_files_and_rejects_removed_entries(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the integration test")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            pak = dota / "game/dota/pak01_dir.vpk"
+            pak.parent.mkdir(parents=True)
+            cache = root / "extracted"
+            base_resource = "scripts/npc/defaults/axe.txt"
+            cached_base = cache / base_resource
+            cached_base.parent.mkdir(parents=True)
+            cached_base.write_text('"DOTAHeroes" { "npc_dota_hero_axe" { "Model" "models/stale.vmdl" } }')
+            schemas = {
+                "scripts/items/items_game.txt": b'"items_game" {}',
+                "scripts/npc/npc_units.txt": b'"DOTAUnits" {}',
+                "scripts/npc/npc_heroes.txt": b'#base "heroes/axe.txt"\n"DOTAHeroes" {}',
+                "scripts/npc/heroes/axe.txt": b'#base "../defaults/AXE.TXT"\n"DOTAHeroes" {}',
+                base_resource: b'"DOTAHeroes" { "npc_dota_hero_axe" { "Model" "models/heroes/axe/axe.vmdl" } }',
+            }
+            self.write_test_vpk_entries(pak, schemas)
+            _items, heroes, _units = generator.load_or_extract_schema(
+                dota, extractor, cache, progress=lambda _message: None,
+            )
+            self.assertEqual(generator.load_hero_models(heroes)["npc_dota_hero_axe"], "models/heroes/axe/axe.vmdl")
+            self.assertEqual(cached_base.read_bytes(), schemas[base_resource])
+            del schemas[base_resource]
+            self.write_test_vpk_entries(pak, schemas)
+            with self.assertRaisesRegex(FileNotFoundError, "Required schema #base file.*axe.txt"):
+                generator.load_or_extract_schema(dota, extractor, cache, progress=lambda _message: None)
+            self.assertFalse(cached_base.exists())
+
+    def test_schema_extraction_rejects_base_paths_outside_cache(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the integration test")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dota = root / "dota 2 beta"
+            pak = dota / "game/dota/pak01_dir.vpk"
+            pak.parent.mkdir(parents=True)
+            self.write_test_vpk_entries(pak, {
+                "scripts/items/items_game.txt": b'"items_game" {}',
+                "scripts/npc/npc_units.txt": b'"DOTAUnits" {}',
+                "scripts/npc/npc_heroes.txt": b'#base "../../../outside.txt"\n"DOTAHeroes" {}',
+            })
+            outside = root / "outside.txt"
+            outside.write_text("preserve me")
+            with self.assertRaisesRegex(ValueError, "Unsafe #base path"):
+                generator.load_or_extract_schema(dota, extractor, root / "extracted", progress=lambda _message: None)
+            self.assertEqual(outside.read_text(), "preserve me")
+
     @staticmethod
     def extractor_path():
         published_extractor = os.environ.get("DOTA2_COSMETIC_DISABLER_TEST_EXTRACTOR")
@@ -5943,6 +5996,18 @@ class PackagedReleaseSmokeTests(unittest.TestCase):
         application = Path(exact_application).resolve()
         self.assertTrue(application.is_file(), f"Packaged application was not found: {application}")
 
+        version = subprocess.run(
+            [str(application), "--version"], capture_output=True, text=True,
+            check=False, timeout=30,
+        )
+        self.assertEqual(version.returncode, 0, version.stderr)
+        self.assertEqual(version.stdout.strip().split()[-1], generator.VERSION)
+
+        for use_bases in (False, True):
+            with self.subTest(schema_base_inheritance=use_bases):
+                self._exercise_packaged_application(application, use_bases)
+
+    def _exercise_packaged_application(self, application, use_bases):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             isolated_cwd = root / "isolated-working-directory"
@@ -6035,12 +6100,25 @@ class PackagedReleaseSmokeTests(unittest.TestCase):
     "npc_dota_units_base" { "Model" "models/development/invisiblebox.vmdl" }
 }
 '''
+            schemas = {
+                "scripts/items/items_game.txt": items_game,
+                "scripts/npc/npc_heroes.txt": npc_heroes,
+                "scripts/npc/npc_units.txt": npc_units,
+            }
+            if use_bases:
+                schemas.update({
+                    "scripts/items/items_game.txt": b'#base "items_default.txt"\n"items_game" {}',
+                    "scripts/items/items_default.txt": items_game,
+                    "scripts/npc/npc_heroes.txt": b'#base "heroes/test.txt"\n"DOTAHeroes" {}',
+                    "scripts/npc/heroes/test.txt": b'#base "../defaults/test.txt"\n"DOTAHeroes" {}',
+                    "scripts/npc/defaults/test.txt": npc_heroes,
+                    "scripts/npc/npc_units.txt": b'#base "units_default.txt"\n"DOTAUnits" {}',
+                    "scripts/npc/units_default.txt": npc_units,
+                })
             VpkExtractorIntegrationTests.write_test_vpk_entries(
                 pak,
                 {
-                    "scripts/items/items_game.txt": items_game,
-                    "scripts/npc/npc_heroes.txt": npc_heroes,
-                    "scripts/npc/npc_units.txt": npc_units,
+                    **schemas,
                     "models/heroes/test/default_head.vmdl_c": default_model,
                     "materials/models/heroes/test/head_color.vmat_c": default_material,
                     "particles/units/heroes/test/default_attack.vpcf_c": default_particle,

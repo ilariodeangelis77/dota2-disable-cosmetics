@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..constants import MODEL_ASSET_DEFAULT_EXCEPTIONS, RESOURCE_PARTICLE
+from ..constants import (
+    INVISIBLE_MODEL,
+    MODEL_ASSET_DEFAULT_EXCEPTIONS,
+    RESOURCE_MODEL,
+    RESOURCE_PARTICLE,
+)
 from ..domain import Mapping
+from ..resources import canonical
 from .context import PlanningContext
 
 
@@ -193,6 +199,15 @@ def resolve_candidates(context: PlanningContext) -> list[Mapping]:
     for mapping in _ordered_candidates(context.candidates):
         _merge_candidate(context, chosen, mapping)
     _resolve_particle_routes(context, chosen)
+    # Conflicting visible candidates can carry equipped skin requirements onto
+    # the winning hidden model, which has no render materials to duplicate.
+    for target, mapping in chosen.items():
+        if (
+            mapping.resource_type == RESOURCE_MODEL
+            and canonical(mapping.source) == canonical(INVISIBLE_MODEL)
+            and mapping.required_material_groups > 1
+        ):
+            chosen[target] = replace(mapping, required_material_groups=1)
     return sorted(
         chosen.values(),
         key=lambda mapping: (mapping.resource_type, mapping.target, mapping.source),

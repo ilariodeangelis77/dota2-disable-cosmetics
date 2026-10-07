@@ -51,6 +51,12 @@ class TokenStream:
     def __init__(self, text: str):
         self._iterator = self._tokens(text)
 
+    @classmethod
+    def from_tokens(cls, tokens: Iterator[str]) -> TokenStream:
+        stream = cls("")
+        stream._iterator = tokens
+        return stream
+
     @staticmethod
     def _tokens(text: str) -> Iterator[str]:
         for match in _TOKEN_RE.finditer(text):
@@ -68,6 +74,10 @@ class TokenStream:
             return next(self._iterator)
         except StopIteration as exc:
             raise ValueError("Unexpected end of KeyValues input") from exc
+
+    def next_optional(self) -> Optional[str]:
+        """Allow EOF between complete top-level entries, never inside a value."""
+        return next(self._iterator, None)
 
     def expect(self, expected: str) -> None:
         actual = self.next()

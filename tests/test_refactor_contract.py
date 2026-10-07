@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import gettext
+import re
 import importlib
 import sys
 import unittest
@@ -73,6 +75,23 @@ class PublicFacadeContractTests(unittest.TestCase):
             r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$",
         )
         self.assertEqual(legacy.VERSION, version_module.VERSION)
+
+    def test_readme_and_translation_metadata_match_application_version(self):
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn(f'alt="Version {legacy.VERSION}"', readme)
+        self.assertIn(f"badge/version-{legacy.VERSION}-", readme)
+        locales = PROJECT_ROOT / "dota_disabler/locales"
+        project_version = f"Dota 2 Cosmetic Disabler {legacy.VERSION}"
+        for path in [locales / "ui.pot", *locales.rglob("ui.po")]:
+            with self.subTest(catalog=path.relative_to(PROJECT_ROOT).as_posix()):
+                header = re.search(r'"Project-Id-Version: ([^"\\]+)\\n"', path.read_text(encoding="utf-8"))
+                self.assertIsNotNone(header)
+                self.assertEqual(header.group(1), project_version)
+        for path in locales.rglob("ui.mo"):
+            with self.subTest(compiled_catalog=path.relative_to(PROJECT_ROOT).as_posix()):
+                with path.open("rb") as stream:
+                    metadata = gettext.GNUTranslations(stream).info()
+                self.assertEqual(metadata["project-id-version"], project_version)
 
 
 class CliContractTests(unittest.TestCase):

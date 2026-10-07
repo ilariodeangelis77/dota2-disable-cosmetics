@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.2" src="https://img.shields.io/badge/version-0.9.2-E85D4A?style=flat-square" /></a>
+  <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/releases"><img alt="Version 0.9.3" src="https://img.shields.io/badge/version-0.9.3-E85D4A?style=flat-square" /></a>
   <img alt="Windows, Linux, and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-4B8BBE?style=flat-square" />
   <a href="https://github.com/ilariodeangelis77/dota2-disable-cosmetics/actions/workflows/build-releases.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/ilariodeangelis77/dota2-disable-cosmetics/build-releases.yml?branch=main&amp;style=flat-square&amp;logo=githubactions&amp;logoColor=white&amp;label=build" /></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/ilariodeangelis77/dota2-disable-cosmetics?style=flat-square&amp;color=2EA043" /></a>
@@ -309,7 +309,8 @@ not available.
 ## How it works
 
 1. The application reads `items_game.txt`, `npc_heroes.txt`, and `npc_units.txt` from the installed
-   Dota VPK.
+   Dota VPK, including files referenced by `#base`. Inherited definitions fill missing keys while
+   preserving values declared in the referring file. Missing or cyclic references stop the build.
 2. The planner derives default models and effects, resolves conflicts deterministically, and writes
    a reviewable mapping report.
 3. Only required resources and localization compatibility files for Dota's Steam-selected
@@ -341,8 +342,11 @@ Every release is checked at three levels:
 3. **In-game checks** confirm representative heroes, effects, and reviewed Persona bridges in the
    Armory, Demo Hero, or a custom lobby.
 
-The latest full audit packed, reopened, and CRC-validated **16,502 generated resources** with no
-missing final sources.
+The latest full audit against Dota Steam build `25768240` on 2026-10-07 packed, reopened, and
+CRC-validated **16,832 generated resources** with no missing final sources. A packaged rebuild
+also validated 240 localization catalogs in the same archive. Manual feedback confirmed that many
+recent skins were restored successfully; a broader individual Arcana and Persona visual pass remains
+pending.
 
 Recent live checks include Crystal Maiden, Mirana, Anti-Mage, Invoker, and the Morphling, Oracle,
 Axe, Legion Commander, and Bristleback Automatons. Dota updates can change resources or rendering
@@ -392,6 +396,8 @@ the compiled catalogs and automatically runs the packaged layout smoke test for 
 locale.
 
 Analyze already extracted schemas without reading or modifying a Dota installation:
+
+Keep any `#base` dependencies alongside the schemas in their original relative directory layout.
 
 ```powershell
 python .\disable_cosmetics.py analyze `
