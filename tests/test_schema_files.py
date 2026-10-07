@@ -200,7 +200,7 @@ class SchemaBaseTests(unittest.TestCase):
             /* #base "comment_two.txt" */
             #base "BASE.TXT"
         ''')
-        self.assertEqual(schema_files.schema_base_files(path, self.root), [self.root / "base.txt"])
+        self.assertEqual(schema_files.schema_base_files(path, self.root), [(self.root / "base.txt").resolve()])
 
     def test_plain_schemas_and_commented_directives_still_parse(self):
         for comment in ("", '// #base "missing.txt"\n'):
