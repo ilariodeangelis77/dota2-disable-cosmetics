@@ -111,6 +111,12 @@ def finalize_plan(context: PlanningContext, mappings: list[Mapping]) -> Plan:
         ],
         "bodygroup_schema_items_reset": 0,
         "bodygroup_hero_fallbacks": counters["bodygroup_hero_fallbacks"],
+        "hidden_bodygroup_models_restored": counters[
+            "hidden_bodygroup_models_restored"
+        ],
+        "hidden_bodygroup_items_restored": len(
+            context.bodygroup_restorations.restored_item_ids
+        ),
         "full_hero_wearable_fallbacks": counters[
             "full_hero_wearable_fallbacks"
         ],

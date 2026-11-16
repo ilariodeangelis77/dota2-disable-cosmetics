@@ -9,7 +9,7 @@ namespace Dota2CosmeticDisabler.ModelPatcher;
 
 internal static partial class Program
 {
-    private const string Version = "0.9.0";
+    private const string Version = "0.9.4";
 
     public static int Main(string[] args)
     {
@@ -222,12 +222,18 @@ internal static partial class Program
         foreach (var line in lines)
         {
             var fields = line.Split('\t');
-            if (fields.Length != 3 || fields.Any(field => string.IsNullOrWhiteSpace(field)))
+            if (fields.Length is < 3 or > 4 || fields.Any(field => string.IsNullOrWhiteSpace(field)))
             {
-                throw new ArgumentException("Each patch manifest line must contain input, output, and group count.");
+                throw new ArgumentException(
+                    "Each patch manifest line must contain input, output, group count, "
+                    + "and optionally a comma-separated bodygroup list.");
             }
-            var result = PatchModel(
-                ["--input", fields[0], "--output", fields[1], "--groups", fields[2]]);
+            string[] patchArgs = ["--input", fields[0], "--output", fields[1], "--groups", fields[2]];
+            if (fields.Length == 4 && fields[3] != "-")
+            {
+                patchArgs = [.. patchArgs, "--restore-bodygroups", fields[3]];
+            }
+            var result = PatchModel(patchArgs);
             if (result != 0)
             {
                 return result;
@@ -241,7 +247,12 @@ internal static partial class Program
 
     private static int PatchModel(string[] args)
     {
-        var options = ParseOptions(args, "--input", "--output", "--groups");
+        var options = ParseOptions(
+            args,
+            "--input",
+            "--output",
+            "--groups",
+            "--restore-bodygroups");
         var inputPath = RequireFile(options, "--input", ".vmdl_c");
         var outputPath = Path.GetFullPath(RequireOption(options, "--output"));
         if (!outputPath.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase))
@@ -252,10 +263,25 @@ internal static partial class Program
         {
             throw new ArgumentException("Input and output model paths must be different.");
         }
-        if (!int.TryParse(RequireOption(options, "--groups"), out var requiredGroups)
-            || requiredGroups is < 2 or > 16)
+        var restoreBodygroups = options.TryGetValue("--restore-bodygroups", out var bodygroupList)
+            ? bodygroupList
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : [];
+        if (options.ContainsKey("--restore-bodygroups") && restoreBodygroups.Length == 0)
         {
-            throw new ArgumentException("Required material groups must be between 2 and 16.");
+            throw new ArgumentException("The bodygroup restoration list is empty.");
+        }
+        // One material group is valid only when the patch restores bodygroups;
+        // a material-only patch must add at least one duplicate group.
+        var minimumGroups = restoreBodygroups.Length == 0 ? 2 : 1;
+        if (!int.TryParse(RequireOption(options, "--groups"), out var requiredGroups)
+            || requiredGroups < minimumGroups
+            || requiredGroups > 16)
+        {
+            throw new ArgumentException(
+                $"Required material groups must be between {minimumGroups} and 16.");
         }
 
         var originalBytes = File.ReadAllBytes(inputPath);
@@ -266,12 +292,18 @@ internal static partial class Program
             throw new InvalidDataException("The input DATA block is not a compiled Source 2 model.");
         }
 
-        var groups = GetOrCreateMaterialGroups(model);
-        var originalGroupCount = groups.Count;
-        if (originalGroupCount < requiredGroups)
+        var originalGroupCount = model.GetMaterialGroups().Count();
+        if (requiredGroups > 1 && originalGroupCount < requiredGroups)
         {
+            var groups = GetOrCreateMaterialGroups(model);
             AddBaseMaterialGroups(model, groups, originalBytes, requiredGroups);
         }
+        var bodygroupResult = restoreBodygroups.Length == 0
+            ? new BodygroupRestoreResult([], [], 0)
+            : ModelBodygroupRestorer.Restore(model, restoreBodygroups);
+        var expectedMasks = ModelBodygroupRestorer.ReadMeshGroupMasks(model);
+        var modified = (requiredGroups > 1 && originalGroupCount < requiredGroups)
+            || bodygroupResult.ChangedMeshes > 0;
 
         var outputDirectory = Path.GetDirectoryName(outputPath)
             ?? throw new InvalidOperationException("The output path has no parent directory.");
@@ -281,7 +313,7 @@ internal static partial class Program
             $".{Path.GetFileNameWithoutExtension(outputPath)}.{Guid.NewGuid():N}.vmdl_c");
         try
         {
-            if (originalGroupCount >= requiredGroups)
+            if (!modified)
             {
                 File.WriteAllBytes(temporaryPath, originalBytes);
             }
@@ -297,13 +329,17 @@ internal static partial class Program
                 resource,
                 originalBytes,
                 temporaryPath,
-                requiredGroups);
+                requiredGroups,
+                expectedMasks);
             File.Move(temporaryPath, outputPath, overwrite: true);
             Console.WriteLine(
                 $"{{\"input_groups\":{originalGroupCount},"
                 + $"\"output_groups\":{finalGroupCount},"
                 + $"\"required_groups\":{requiredGroups},"
-                + $"\"modified\":{(originalGroupCount < requiredGroups ? "true" : "false")},"
+                + $"\"restored_bodygroups\":{JsonStringArray(bodygroupResult.RestoredBodygroups)},"
+                + $"\"missing_bodygroups\":{JsonStringArray(bodygroupResult.MissingBodygroups)},"
+                + $"\"changed_meshes\":{bodygroupResult.ChangedMeshes},"
+                + $"\"modified\":{(modified ? "true" : "false")},"
                 + $"\"output_bytes\":{new FileInfo(outputPath).Length}}}");
             return 0;
         }
@@ -465,7 +501,8 @@ internal static partial class Program
         Resource original,
         byte[] originalBytes,
         string outputPath,
-        int requiredGroups)
+        int requiredGroups,
+        IReadOnlyList<ulong> expectedMeshGroupMasks)
     {
         var outputBytes = File.ReadAllBytes(outputPath);
         using var patched = new Resource();
@@ -475,9 +512,18 @@ internal static partial class Program
             throw new InvalidDataException("The patched output no longer parses as a model.");
         }
         var finalGroupCount = patchedModel.GetMaterialGroups().Count();
-        if (finalGroupCount < requiredGroups)
+        if (requiredGroups > 1 && finalGroupCount < requiredGroups)
         {
             throw new InvalidDataException("The patched output has too few material groups.");
+        }
+        var actualMeshGroupMasks = ModelBodygroupRestorer.ReadMeshGroupMasks(patchedModel);
+        if (!actualMeshGroupMasks.SequenceEqual(expectedMeshGroupMasks))
+        {
+            throw new InvalidDataException(
+                "The patched output does not contain the expected mesh-group masks "
+                + $"({Path.GetFileName(outputPath)}: expected "
+                + $"[{string.Join(",", expectedMeshGroupMasks)}], found "
+                + $"[{string.Join(",", actualMeshGroupMasks)}]).");
         }
         if (original.Blocks.Count != patched.Blocks.Count)
         {
@@ -533,6 +579,13 @@ internal static partial class Program
         }
         return options;
     }
+
+    private static string JsonStringArray(IEnumerable<string> values) =>
+        "["
+        + string.Join(
+            ",",
+            values.Select(value => System.Text.Json.JsonSerializer.Serialize(value)))
+        + "]";
 
     private static (string[] Arguments, bool Found) RemoveFlag(string[] args, string flag)
     {

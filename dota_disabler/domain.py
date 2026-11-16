@@ -51,6 +51,9 @@ class Mapping:
     neutralize_model_skin: bool = False
     required_material_groups: int = 1
     neutralize_bodygroup: bool = False
+    # Bodygroups whose non-default choices are compiled to render the default
+    # choice, so cosmetics that hide a default hero part cannot leave a hole.
+    restore_bodygroups: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

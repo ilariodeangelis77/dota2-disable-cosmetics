@@ -7,10 +7,10 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dota 2 Cosmetic Disabler 0.9.3\n"
+"Project-Id-Version: Dota 2 Cosmetic Disabler 0.9.4\n"
 "Report-Msgid-Bugs-To: https://github.com/ilariodeangelis77/dota2-disable-"
 "cosmetics/issues\n"
-"POT-Creation-Date: 2026-10-07 17:38+0200\n"
+"POT-Creation-Date: 2026-11-16 22:35+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"

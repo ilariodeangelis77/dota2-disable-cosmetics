@@ -360,12 +360,17 @@ def _build_cosmetics_unlocked(
         and mapping.required_material_groups > 1
         for mapping in plan.mappings
     )
+    bodygroup_patch_targets = sum(
+        mapping.resource_type == RESOURCE_MODEL and bool(mapping.restore_bodygroups)
+        for mapping in plan.mappings
+    )
     model_patcher: Optional[Path] = None
     composition_targets = len(plan.model_compositions)
     attachment_offset_targets = len(plan.model_attachment_offsets)
     particle_bridge_targets = len(plan.model_particle_bridges)
     if (
         group_patch_targets
+        or bodygroup_patch_targets
         or composition_targets
         or attachment_offset_targets
         or particle_bridge_targets
@@ -376,6 +381,10 @@ def _build_cosmetics_unlocked(
         progress(
             f"Preparing {group_patch_targets} skin-sensitive default-model replacement(s) "
             "with duplicated base material groups."
+        )
+    if bodygroup_patch_targets:
+        progress(
+            f"Restoring hidden default bodygroups in {bodygroup_patch_targets} hero model(s)."
         )
     if composition_targets:
         progress(

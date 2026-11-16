@@ -1,6 +1,7 @@
 import json
 import io
 import os
+import re
 import struct
 import subprocess
 import tempfile
@@ -2405,20 +2406,133 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan.mappings[0].reason, "integrated hero-slot cosmetic hidden")
         self.assertEqual(plan.stats["integrated_slot_cosmetics_hidden"], 1)
 
-    def test_bodygroup_wearable_uses_full_hero_fallback(self):
+    @staticmethod
+    def hide_rule(asset, bodygroup, value="1"):
+        return {
+            "type": "bodygroup_visibility",
+            "asset": asset,
+            "modifier": bodygroup,
+            "value": value,
+        }
+
+    def test_hidden_hero_bodygroup_keeps_slot_default_and_restores_hero_model(self):
         default = item(1, slot="head", baseitem="1", model="models/heroes/test/head.vmdl")
         bodygroup = item(
             2,
             slot="head",
             model="models/items/test/bodygroup_head.vmdl",
-            visuals=[
-                {
-                    "type": "bodygroup_visibility",
-                    "asset": "models/heroes/test/test.vmdl",
-                    "modifier": "head",
-                    "value": "1",
-                }
-            ],
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default, bodygroup)},
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+        )
+
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        self.assertEqual(len(plan.mappings), 2)
+        wearable = by_target["models/items/test/bodygroup_head.vmdl"]
+        self.assertEqual(wearable.source, "models/heroes/test/head.vmdl")
+        self.assertEqual(wearable.reason, "wearable replaced with slot default")
+        self.assertEqual(wearable.restore_bodygroups, ())
+        hero_model = by_target["models/heroes/test/test.vmdl"]
+        self.assertEqual(hero_model.source, "models/heroes/test/test.vmdl")
+        self.assertEqual(hero_model.restore_bodygroups, ("head",))
+        self.assertEqual(hero_model.reason, "hidden default hero bodygroups restored")
+        self.assertEqual(hero_model.category, generator.CATEGORY_STANDARD_WEARABLES)
+        self.assertEqual(hero_model.hero, HERO)
+        self.assertFalse(wearable.neutralize_bodygroup)
+        self.assertEqual(plan.stats["bodygroup_hero_fallbacks"], 0)
+        self.assertEqual(plan.stats["hidden_bodygroup_models_restored"], 1)
+        self.assertEqual(plan.stats["hidden_bodygroup_items_restored"], 1)
+
+    def test_hidden_bodygroups_from_several_slots_merge_into_one_hero_patch(self):
+        armor = item(1, slot="armor", baseitem="1", model="models/heroes/test/armor.vmdl")
+        head = item(2, slot="head", baseitem="1", model="models/heroes/test/hood.vmdl")
+        cosmetic_armor = item(
+            3,
+            slot="armor",
+            model="models/items/test/monster_armor.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "body")],
+        )
+        cosmetic_head = item(
+            4,
+            slot="head",
+            model="models/items/test/monster_head.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {
+                record.item_id: record
+                for record in (armor, head, cosmetic_armor, cosmetic_head)
+            },
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+        )
+
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        self.assertEqual(
+            by_target["models/items/test/monster_armor.vmdl"].source,
+            "models/heroes/test/armor.vmdl",
+        )
+        self.assertEqual(
+            by_target["models/items/test/monster_head.vmdl"].source,
+            "models/heroes/test/hood.vmdl",
+        )
+        self.assertEqual(
+            by_target["models/heroes/test/test.vmdl"].restore_bodygroups,
+            ("body", "head"),
+        )
+        self.assertEqual(plan.stats["hidden_bodygroup_items_restored"], 2)
+
+    def test_integrated_bodygroup_slot_is_hidden_and_restored_in_hero_model(self):
+        default = item(1, slot="head", baseitem="1")
+        bodygroup = item(
+            2,
+            slot="head",
+            model="models/items/test/integrated_bodygroup_head.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
+        )
+        no_default = item(
+            3,
+            slot="tail",
+            model="models/items/test/integrated_tail.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "tail")],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default, bodygroup, no_default)},
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+        )
+
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        for target in (
+            "models/items/test/integrated_bodygroup_head.vmdl",
+            "models/items/test/integrated_tail.vmdl",
+        ):
+            self.assertEqual(by_target[target].source, generator.INVISIBLE_MODEL)
+            self.assertEqual(by_target[target].reason, "integrated hero-slot cosmetic hidden")
+            self.assertFalse(by_target[target].neutralize_bodygroup)
+        self.assertEqual(
+            by_target["models/heroes/test/test.vmdl"].restore_bodygroups,
+            ("head", "tail"),
+        )
+        self.assertEqual(plan.stats["bodygroup_schema_items_reset"], 0)
+        self.assertEqual(plan.stats["bodygroup_sensitive_models_skipped"], 0)
+
+    def test_bodygroup_on_unreplaced_model_keeps_full_hero_fallback(self):
+        default = item(1, slot="head", baseitem="1", model="models/heroes/test/head.vmdl")
+        bodygroup = item(
+            2,
+            slot="head",
+            model="models/items/test/bodygroup_head.vmdl",
+            visuals=[self.hide_rule("models/items/test/unreplaced_body.vmdl", "head")],
         )
 
         plan = generator.build_plan(
@@ -2430,29 +2544,27 @@ class MappingTests(unittest.TestCase):
 
         self.assertEqual(len(plan.mappings), 1)
         self.assertEqual(plan.mappings[0].source, "models/heroes/test/test.vmdl")
-        self.assertEqual(plan.mappings[0].target, "models/items/test/bodygroup_head.vmdl")
-        self.assertFalse(plan.mappings[0].neutralize_bodygroup)
         self.assertEqual(
             plan.mappings[0].reason,
             "bodygroup wearable replaced with full hero fallback",
         )
-        self.assertEqual(plan.stats["bodygroup_sensitive_models_skipped"], 0)
+        self.assertEqual(plan.mappings[0].restore_bodygroups, ())
         self.assertEqual(plan.stats["bodygroup_hero_fallbacks"], 1)
+        self.assertEqual(plan.stats["hidden_bodygroup_models_restored"], 0)
 
-    def test_integrated_bodygroup_slot_uses_full_hero_without_schema_reset(self):
-        default = item(1, slot="head", baseitem="1")
+    def test_bodygroup_hidden_by_default_item_is_not_restored(self):
+        default = item(
+            1,
+            slot="head",
+            baseitem="1",
+            model="models/heroes/test/head.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
+        )
         bodygroup = item(
             2,
             slot="head",
-            model="models/items/test/integrated_bodygroup_head.vmdl",
-            visuals=[
-                {
-                    "type": "bodygroup_visibility",
-                    "asset": "models/heroes/test/test.vmdl",
-                    "modifier": "head",
-                    "value": "1",
-                }
-            ],
+            model="models/items/test/bodygroup_head.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
         )
 
         plan = generator.build_plan(
@@ -2462,10 +2574,138 @@ class MappingTests(unittest.TestCase):
             [],
         )
 
-        self.assertEqual(plan.mappings[0].source, "models/heroes/test/test.vmdl")
-        self.assertFalse(plan.mappings[0].neutralize_bodygroup)
-        self.assertEqual(plan.stats["bodygroup_schema_items_reset"], 0)
-        self.assertEqual(plan.stats["bodygroup_sensitive_models_skipped"], 0)
+        self.assertNotIn(
+            "models/heroes/test/test.vmdl",
+            {mapping.target for mapping in plan.mappings},
+        )
+        self.assertEqual(plan.stats["hidden_bodygroup_models_restored"], 0)
+
+    def test_bodygroup_is_not_restored_under_a_disabled_category_cosmetic(self):
+        default = item(1, slot="head", baseitem="1", model="models/heroes/test/head.vmdl")
+        wearable = item(
+            2,
+            slot="head",
+            model="models/items/test/bodygroup_head.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "head")],
+        )
+        special = item(
+            3,
+            slot="head",
+            model="models/items/test/special_head.vmdl",
+            visuals=[
+                self.hide_rule("models/heroes/test/test.vmdl", "head"),
+                {
+                    "type": "model",
+                    "asset": "models/items/test/special_head.vmdl",
+                    "modifier": "models/items/test/special_head_refit.vmdl",
+                },
+            ],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default, wearable, special)},
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+            enabled_categories={generator.CATEGORY_STANDARD_WEARABLES},
+        )
+
+        targets = {mapping.target: mapping for mapping in plan.mappings}
+        self.assertNotIn("models/heroes/test/test.vmdl", targets)
+        self.assertEqual(
+            targets["models/items/test/bodygroup_head.vmdl"].reason,
+            "bodygroup wearable replaced with full hero fallback",
+        )
+
+    def test_alternate_hero_model_replacement_restores_its_hidden_bodygroups(self):
+        default = item(1, slot="legs", baseitem="1", model="models/heroes/test/legs.vmdl")
+        arcana = item(
+            2,
+            slot="hero_base",
+            visuals=[
+                {
+                    "type": "entity_model",
+                    "asset": HERO,
+                    "modifier": "models/items/test/arcana_body.vmdl",
+                }
+            ],
+        )
+        legs = item(
+            3,
+            slot="legs",
+            model="models/items/test/monster_legs.vmdl",
+            visuals=[
+                self.hide_rule("models/items/test/arcana_body.vmdl", "lower_body"),
+                self.hide_rule("models/heroes/test/test.vmdl", "lower_body"),
+            ],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default, arcana, legs)},
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+        )
+
+        by_target = {mapping.target: mapping for mapping in plan.mappings}
+        arcana_mapping = by_target["models/items/test/arcana_body.vmdl"]
+        self.assertEqual(arcana_mapping.source, "models/heroes/test/test.vmdl")
+        self.assertEqual(arcana_mapping.item_id, "2")
+        self.assertEqual(arcana_mapping.restore_bodygroups, ("lower_body",))
+        self.assertEqual(
+            by_target["models/heroes/test/test.vmdl"].restore_bodygroups,
+            ("lower_body",),
+        )
+        self.assertEqual(
+            by_target["models/items/test/monster_legs.vmdl"].source,
+            "models/heroes/test/legs.vmdl",
+        )
+        self.assertEqual(plan.stats["hidden_bodygroup_models_restored"], 2)
+
+    def test_bodygroup_rule_showing_the_default_choice_is_ignored(self):
+        default = item(1, slot="arms", baseitem="1", model="models/heroes/test/arms.vmdl")
+        cosmetic = item(
+            2,
+            slot="arms",
+            model="models/items/test/arms.vmdl",
+            visuals=[self.hide_rule("models/heroes/test/test.vmdl", "hand_r", value="0")],
+        )
+
+        plan = generator.build_plan(
+            {},
+            {record.item_id: record for record in (default, cosmetic)},
+            {HERO: "models/heroes/test/test.vmdl"},
+            [],
+        )
+
+        self.assertEqual(
+            [mapping.target for mapping in plan.mappings],
+            ["models/items/test/arms.vmdl"],
+        )
+
+    def test_skin_material_cleanup_keeps_hero_bodygroup_restoration(self):
+        restoration = generator.Mapping(
+            source="models/heroes/test/test.vmdl",
+            target="models/heroes/test/test.vmdl",
+            reason="hidden default hero bodygroups restored",
+            restore_bodygroups=("head",),
+        )
+        skin_self_mapping = generator.Mapping(
+            source="models/items/test/skinned.vmdl",
+            target="models/items/test/skinned.vmdl",
+            reason="test",
+            neutralize_model_skin=True,
+        )
+        plan = generator.Plan(
+            mappings=[restoration, skin_self_mapping],
+            unresolved=[],
+            stats={},
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            result = generator.apply_model_skin_material_fallbacks(plan, Path(temporary))
+
+        self.assertEqual(result.mappings, [restoration])
 
     def test_reviewed_particle_body_uses_an_atomic_model_and_ambient_bridge(self):
         hero = "npc_dota_hero_wisp"
@@ -3784,6 +4024,67 @@ class GuiViewModelTests(unittest.TestCase):
 
 
 class ModelPatcherDiscoveryTests(unittest.TestCase):
+    def test_batch_patch_manifest_carries_bodygroup_restorations(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            hero_source = root / "cache" / "oracle.vmdl_c"
+            skin_source = root / "cache" / "armor.vmdl_c"
+            hero_destination = root / "staging" / "oracle.vmdl_c"
+            skin_destination = root / "staging" / "skinned.vmdl_c"
+            manifests: list[list[str]] = []
+
+            def fake_run(command, *, quiet, progress_update=None):
+                self.assertTrue(quiet)
+                self.assertIsNone(progress_update)
+                self.assertEqual(command[1:3], ["patch-batch", "--manifest"])
+                manifests.append(
+                    Path(command[3]).read_text(encoding="utf-8").splitlines()
+                )
+                hero_destination.write_bytes(b"patched hero")
+                skin_destination.write_bytes(b"patched skin")
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout=json.dumps({"patched": 2}),
+                    stderr="",
+                )
+
+            with patch.object(model_patcher, "run", side_effect=fake_run):
+                model_patcher.patch_model_material_groups_batch(
+                    root / "patcher.exe",
+                    [
+                        (hero_source, hero_destination, 1, ("head", "body")),
+                        (skin_source, skin_destination, 3),
+                    ],
+                    root / "staging",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual(
+                manifests,
+                [
+                    [
+                        f"{hero_source}\t{hero_destination}\t1\tbody,head",
+                        f"{skin_source}\t{skin_destination}\t3\t-",
+                    ]
+                ],
+            )
+            self.assertEqual(list((root / "staging").glob(".model-skin-patches-*")), [])
+
+    def test_batch_patch_rejects_material_only_job_without_duplicate_groups(self):
+        with self.assertRaisesRegex(ValueError, "at least two material groups"):
+            model_patcher.patch_model_material_groups_batch(
+                Path("patcher.exe"),
+                [(Path("a.vmdl_c"), Path("b.vmdl_c"), 1, ())],
+                Path("."),
+            )
+        with self.assertRaisesRegex(ValueError, "separators"):
+            model_patcher.patch_model_material_groups_batch(
+                Path("patcher.exe"),
+                [(Path("a.vmdl_c"), Path("b.vmdl_c"), 1, ("head,body",))],
+                Path("."),
+            )
+
     def test_particle_body_bridge_result_is_verified(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -4079,7 +4380,7 @@ class ModelPatcherDiscoveryTests(unittest.TestCase):
             patch.object(model_patcher, "run", return_value=process),
             self.assertRaisesRegex(
                 generator.GeneratorError,
-                r"Expected 0\.9\.0.*0\.1\.0",
+                rf"Expected {re.escape(model_patcher.MODEL_PATCHER_VERSION)}.*0\.1\.0",
             ),
         ):
             model_patcher.validate_model_patcher(Path("patcher"))
@@ -4405,9 +4706,10 @@ class DeploymentTests(unittest.TestCase):
                 progress_update,
             ):
                 self.assertEqual(len(jobs), 1)
-                patch_source, destination, groups = jobs[0]
+                patch_source, destination, groups, bodygroups = jobs[0]
                 self.assertTrue(os.path.samefile(patch_source, source))
                 self.assertEqual(groups, 3)
+                self.assertEqual(bodygroups, ())
                 destination.parent.mkdir(parents=True)
                 destination.write_bytes(patch_source.read_bytes() + b";groups=3")
                 progress_update("patch", 1, 1)
@@ -4443,6 +4745,120 @@ class DeploymentTests(unittest.TestCase):
                 (unpacked / "models/items/test/skinned.vmdl_c").read_bytes(),
                 b"compiled model;groups=3",
             )
+
+    def test_hidden_bodygroup_hero_model_is_patched_before_vpk_packaging(self):
+        extractor = self.extractor_path()
+        if not extractor.is_file():
+            self.skipTest("Build tools/VpkExtractor in Release mode to run the deployment test")
+        plan = generator.Plan(
+            mappings=[
+                generator.Mapping(
+                    source="models/heroes/test/test.vmdl",
+                    target="models/heroes/test/test.vmdl",
+                    reason="hidden default hero bodygroups restored",
+                    restore_bodygroups=("body", "head"),
+                ),
+                generator.Mapping(
+                    source="models/heroes/test/armor.vmdl",
+                    target="models/items/test/monster_armor.vmdl",
+                    reason="wearable replaced with slot default",
+                ),
+            ],
+            unresolved=[],
+            stats={},
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache = root / "cache"
+            hero_source = cache / "models/heroes/test/test.vmdl_c"
+            armor_source = cache / "models/heroes/test/armor.vmdl_c"
+            hero_source.parent.mkdir(parents=True)
+            hero_source.write_bytes(b"compiled hero")
+            armor_source.write_bytes(b"compiled armor")
+            output = root / "dota_dutch"
+
+            def fake_patch(
+                _patcher,
+                jobs,
+                _manifest_directory,
+                *,
+                progress,
+                progress_update,
+            ):
+                self.assertEqual(len(jobs), 1)
+                patch_source, destination, groups, bodygroups = jobs[0]
+                self.assertTrue(os.path.samefile(patch_source, hero_source))
+                self.assertEqual(groups, 1)
+                self.assertEqual(bodygroups, ("body", "head"))
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(patch_source.read_bytes() + b";bodygroups")
+                progress_update("patch", 1, 1)
+
+            with patch(
+                "dota_disabler.deployment.patch_model_material_groups_batch",
+                side_effect=fake_patch,
+            ) as patch_model:
+                copied, missing = generator.deploy_overrides(
+                    plan,
+                    cache,
+                    output,
+                    root / "work",
+                    extractor=extractor,
+                    model_patcher=root / "patcher.exe",
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+
+            self.assertEqual((copied, missing), (2, []))
+            patch_model.assert_called_once()
+            marker = json.loads((output / generator.MARKER_FILENAME).read_text(encoding="utf-8"))
+            unpacked = root / "unpacked"
+            generator.extract_vpk(
+                extractor,
+                output / marker["files"][0],
+                marker["resources"],
+                unpacked,
+            )
+            self.assertEqual(
+                (unpacked / "models/heroes/test/test.vmdl_c").read_bytes(),
+                b"compiled hero;bodygroups",
+            )
+            self.assertEqual(
+                (unpacked / "models/items/test/monster_armor.vmdl_c").read_bytes(),
+                b"compiled armor",
+            )
+
+    def test_hidden_bodygroup_restoration_requires_the_model_helper(self):
+        plan = generator.Plan(
+            mappings=[
+                generator.Mapping(
+                    source="models/heroes/test/test.vmdl",
+                    target="models/heroes/test/test.vmdl",
+                    reason="hidden default hero bodygroups restored",
+                    restore_bodygroups=("head",),
+                )
+            ],
+            unresolved=[],
+            stats={},
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(generator.GeneratorError, "model skin patcher"):
+                generator.deploy_overrides(
+                    plan,
+                    root / "cache",
+                    root / "dota_dutch",
+                    root / "work",
+                    extractor=root / "extractor.exe",
+                    model_patcher=None,
+                    clean_first=True,
+                    allow_missing=False,
+                    language="dutch",
+                    progress=lambda _message: None,
+                )
+            self.assertFalse((root / "dota_dutch").exists())
 
     def test_composed_model_replaces_ordinary_fallback_before_vpk_packaging(self):
         extractor = self.extractor_path()

@@ -25,6 +25,7 @@ def _wearable_source(
     *,
     model_key: str = "model_player",
     has_bodygroup_rules: bool,
+    bodygroups_restored: bool = False,
 ) -> tuple[str | None, bool, bool]:
     full_hero_fallback = (
         has_bodygroup_rules
@@ -42,7 +43,13 @@ def _wearable_source(
         else context.hero_models.get(state.hero)
         if full_hero_fallback
         else context.default_model_for(state.default_item, model_key)
-        or (INVISIBLE_MODEL if state.default_item is not None else None)
+        # A restored hero bodygroup proves the slot is integrated into the hero
+        # model, so a slot without its own default wearable is simply hidden.
+        or (
+            INVISIBLE_MODEL
+            if state.default_item is not None or bodygroups_restored
+            else None
+        )
     )
     return source, full_hero_fallback, reviewed_persona_source is not None
 
@@ -122,7 +129,11 @@ def _add_wearable_models(
         return
     if state.is_base and not context.has_reviewed_persona_slot(state.hero, state.slot):
         return
-    has_bodygroup_rules = any(
+    # Hidden hero parts are normally restored inside the hero model itself, so
+    # the slot keeps its own default wearable. Only bodygroups that cannot be
+    # restored safely still need a whole-hero copy to cover the missing part.
+    bodygroups_restored = context.restores_hidden_bodygroups(state.item)
+    has_bodygroup_rules = not bodygroups_restored and any(
         visual.get("type") == "bodygroup_visibility" for visual in state.item.visuals
     )
 
@@ -132,6 +143,7 @@ def _add_wearable_models(
             state,
             model_key=key,
             has_bodygroup_rules=has_bodygroup_rules,
+            bodygroups_restored=bodygroups_restored,
         )
         if source:
             _record_wearable_fallback(
@@ -175,6 +187,7 @@ def _add_wearable_models(
             context,
             state,
             has_bodygroup_rules=has_bodygroup_rules,
+            bodygroups_restored=bodygroups_restored,
         )
         if source:
             _record_wearable_fallback(

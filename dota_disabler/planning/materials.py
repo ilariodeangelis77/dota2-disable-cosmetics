@@ -232,6 +232,7 @@ def apply_model_skin_material_fallbacks(
         if not (
             mapping.resource_type == RESOURCE_MODEL
             and mapping.source == mapping.target
+            and not mapping.restore_bodygroups
         )
     ]
     mappings = sorted(

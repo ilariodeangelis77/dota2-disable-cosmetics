@@ -16,7 +16,7 @@ from .paths import runtime_asset_root, source_root
 from .vpk import run
 
 
-MODEL_PATCHER_VERSION = "0.9.0"
+MODEL_PATCHER_VERSION = "0.9.4"
 MODEL_COMPOSITION_MODES = frozenset(
     {"shared-root", "skeleton-overlay", "skeleton-union"}
 )
@@ -291,21 +291,51 @@ def bridge_model_particle(
         ) from exc
 
 
+def _normalize_patch_job(
+    job: tuple[Path, Path, int] | tuple[Path, Path, int, Iterable[str]],
+) -> tuple[Path, Path, int, tuple[str, ...]]:
+    if len(job) == 3:
+        source, destination, required_groups = job
+        bodygroups: tuple[str, ...] = ()
+    elif len(job) == 4:
+        source, destination, required_groups, raw_bodygroups = job
+        bodygroups = tuple(sorted({str(name).strip() for name in raw_bodygroups}))
+    else:
+        raise ValueError("A model patch job must contain three or four fields.")
+    if bodygroups:
+        if required_groups < 1:
+            raise ValueError("A model patch requires at least one material group.")
+        if any(
+            not name or any(character in name for character in ",\t\r\n")
+            for name in bodygroups
+        ):
+            raise ValueError("Bodygroup names may not be empty or contain separators.")
+    elif required_groups < 2:
+        raise ValueError("A model skin patch requires at least two material groups.")
+    return source, destination, required_groups, bodygroups
+
+
 def patch_model_material_groups_batch(
     patcher: Path,
-    requests: Iterable[tuple[Path, Path, int]],
+    requests: Iterable[
+        tuple[Path, Path, int] | tuple[Path, Path, int, Iterable[str]]
+    ],
     manifest_directory: Path,
     *,
     progress: ProgressCallback = print,
     progress_update: Optional[WorkProgressCallback] = None,
 ) -> None:
-    jobs = list(requests)
+    """Patch copied models in one helper run.
+
+    Each request adds duplicate base material groups and/or locks the listed
+    bodygroups to their default choice.
+    """
+
+    jobs = [_normalize_patch_job(job) for job in requests]
     if not jobs:
         return
     manifest_directory.mkdir(parents=True, exist_ok=True)
-    for source, destination, required_groups in jobs:
-        if required_groups < 2:
-            raise ValueError("A model skin patch requires at least two material groups.")
+    for source, destination, _required_groups, _bodygroups in jobs:
         if any("\t" in str(path) or "\n" in str(path) or "\r" in str(path) for path in (source, destination)):
             raise ValueError("Model patch paths may not contain tabs or newlines.")
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -321,10 +351,18 @@ def patch_model_material_groups_batch(
             dir=manifest_directory,
             delete=False,
         ) as manifest:
-            for source, destination, required_groups in jobs:
-                manifest.write(f"{source}\t{destination}\t{required_groups}\n")
+            for source, destination, required_groups, bodygroups in jobs:
+                bodygroup_field = ",".join(bodygroups) if bodygroups else "-"
+                manifest.write(
+                    f"{source}\t{destination}\t{required_groups}\t{bodygroup_field}\n"
+                )
             manifest_path = Path(manifest.name)
-        progress(f"Adding default material groups to {len(jobs)} skin-sensitive model(s)...")
+        skin_jobs = sum(required_groups > 1 for _s, _d, required_groups, _b in jobs)
+        bodygroup_jobs = sum(bool(bodygroups) for _s, _d, _r, bodygroups in jobs)
+        if skin_jobs:
+            progress(f"Adding default material groups to {skin_jobs} skin-sensitive model(s)...")
+        if bodygroup_jobs:
+            progress(f"Restoring hidden default bodygroups in {bodygroup_jobs} model(s)...")
         command = [str(patcher), "patch-batch", "--manifest", str(manifest_path)]
         if progress_update is not None:
             command.append("--progress")
@@ -338,7 +376,7 @@ def patch_model_material_groups_batch(
             result = json.loads(lines[-1] if lines else "")
             if int(result["patched"]) != len(jobs):
                 raise ValueError("inconsistent model batch count")
-            if any(not destination.is_file() for _, destination, _ in jobs):
+            if any(not destination.is_file() for _, destination, _, _ in jobs):
                 raise ValueError("a patched model output is missing")
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise GeneratorError(

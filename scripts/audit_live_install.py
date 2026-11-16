@@ -60,6 +60,7 @@ REGRESSION_ITEM_GROUPS = {
     "spirit_of_dark_wood": "spirit of the dark wood",
     "abominable_snowbeast": "abominable snowbeast",
     "roost_of_winter_raven": "roost of the winter raven",
+    "clairvoyant_configuration": "clairvoyant configuration",
 }
 
 
@@ -125,6 +126,7 @@ def audit_live_install(
         model_patcher = None
         if (
             plan.stats.get("alternate_skin_group_patch_targets", 0)
+            or any(mapping.restore_bodygroups for mapping in plan.mappings)
             or plan.model_compositions
             or plan.model_attachment_offsets
             or plan.model_particle_bridges

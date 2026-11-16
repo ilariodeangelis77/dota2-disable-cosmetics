@@ -345,7 +345,8 @@ def deploy_overrides(
     skin_patch_mappings = [
         mapping
         for mapping in plan.mappings
-        if mapping.resource_type == RESOURCE_MODEL and mapping.required_material_groups > 1
+        if mapping.resource_type == RESOURCE_MODEL
+        and (mapping.required_material_groups > 1 or mapping.restore_bodygroups)
     ]
     if (
         skin_patch_mappings
@@ -370,7 +371,7 @@ def deploy_overrides(
     missing: list[dict] = []
     missing_keys: set[tuple[str, str, str]] = set()
     staged_files: list[str] = []
-    patch_jobs: list[tuple[Path, Path, int]] = []
+    patch_jobs: list[tuple[Path, Path, int, tuple[str, ...]]] = []
     composition_jobs: list[
         tuple[
             Path,
@@ -647,8 +648,17 @@ def deploy_overrides(
             )
             continue
         destination = path_under(staging, target_relative)
-        if mapping.resource_type == RESOURCE_MODEL and mapping.required_material_groups > 1:
-            patch_jobs.append((source, destination, mapping.required_material_groups))
+        if mapping.resource_type == RESOURCE_MODEL and (
+            mapping.required_material_groups > 1 or mapping.restore_bodygroups
+        ):
+            patch_jobs.append(
+                (
+                    source,
+                    destination,
+                    mapping.required_material_groups,
+                    mapping.restore_bodygroups,
+                )
+            )
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
@@ -788,7 +798,7 @@ def deploy_overrides(
             ),
         )
         if required_groups > 1:
-            patch_jobs.append((bridge_output, destination, required_groups))
+            patch_jobs.append((bridge_output, destination, required_groups, ()))
 
     composition_operations_completed = 0
     for (
@@ -841,7 +851,7 @@ def deploy_overrides(
             )
         if required_groups > 1:
             patch_jobs.append(
-                (composition_output, destination, required_groups)
+                (composition_output, destination, required_groups, ())
             )
 
     if patch_jobs:
@@ -861,7 +871,7 @@ def deploy_overrides(
                 "model_patch",
                 completed_transformations + completed,
                 model_work_total,
-                f"Patching skin-sensitive models ({completed:,} of {len(patch_jobs):,})",
+                f"Patching default models ({completed:,} of {len(patch_jobs):,})",
             )
 
         patch_model_material_groups_batch(

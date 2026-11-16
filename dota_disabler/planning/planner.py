@@ -9,6 +9,7 @@ from ..domain import ItemRecord, Plan, WorkProgressCallback
 from .conflicts import resolve_candidates, resolve_pending_model_overrides
 from .context import PlanningContext
 from .effects import process_global_effects, process_item_effects
+from .hidden_bodygroups import apply_hidden_bodygroup_restorations
 from .models import process_item_models
 from .validation import finalize_plan
 
@@ -51,7 +52,10 @@ def build_plan(
     resolve_pending_model_overrides(context)
     if work_progress is not None:
         work_progress("model_overrides", item_count + 2, work_total)
-    mappings = resolve_candidates(context)
+    mappings = apply_hidden_bodygroup_restorations(
+        context,
+        resolve_candidates(context),
+    )
     if work_progress is not None:
         work_progress("conflicts", item_count + 3, work_total)
     plan = finalize_plan(context, mappings)

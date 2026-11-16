@@ -40,6 +40,10 @@ from ..resources import (
     looks_like_particle_snapshot,
 )
 from ..schema import item_attr
+from .hidden_bodygroups import (
+    BodygroupRestorationPlan,
+    plan_hidden_bodygroup_restorations,
+)
 from .personas import (
     PERSONA_PROFILES,
     PersonaAttachmentOffsetProfile,
@@ -88,6 +92,7 @@ COUNTER_NAMES = (
     "particle_body_bridges_preserved",
     "model_particle_supplements_planned",
     "model_particle_supplements_skipped",
+    "hidden_bodygroup_models_restored",
 )
 
 
@@ -131,6 +136,9 @@ class PlanningContext:
     unresolved: list[dict] = field(default_factory=list)
     default_sources_by_target: dict[str, set[str]] = field(default_factory=dict)
     pending_model_overrides: list[PendingModelOverride] = field(default_factory=list)
+    bodygroup_restorations: BodygroupRestorationPlan = field(
+        default_factory=lambda: BodygroupRestorationPlan({}, frozenset())
+    )
     counters: dict[str, int] = field(
         default_factory=lambda: {name: 0 for name in COUNTER_NAMES}
     )
@@ -234,7 +242,13 @@ class PlanningContext:
             protected_effect_resources=protected_effect_resources,
         )
         context.validate_persona_profiles()
+        context.bodygroup_restorations = plan_hidden_bodygroup_restorations(context)
         return context
+
+    def restores_hidden_bodygroups(self, item: ItemRecord) -> bool:
+        """Whether every hero part this item hides is restored in the hero model."""
+
+        return item.item_id in self.bodygroup_restorations.restored_item_ids
 
     def increment(self, name: str, amount: int = 1) -> None:
         self.counters[name] += amount
