@@ -580,12 +580,35 @@ internal static partial class Program
         return options;
     }
 
+    // The published helper is trimmed, which disables reflection-based
+    // System.Text.Json serialization, so string literals are escaped by hand.
     private static string JsonStringArray(IEnumerable<string> values) =>
-        "["
-        + string.Join(
-            ",",
-            values.Select(value => System.Text.Json.JsonSerializer.Serialize(value)))
-        + "]";
+        "[" + string.Join(",", values.Select(JsonStringLiteral)) + "]";
+
+    private static string JsonStringLiteral(string value)
+    {
+        var builder = new StringBuilder(value.Length + 2);
+        builder.Append('"');
+        foreach (var character in value)
+        {
+            switch (character)
+            {
+                case '"':
+                    builder.Append("\\\"");
+                    break;
+                case '\\':
+                    builder.Append("\\\\");
+                    break;
+                case < ' ':
+                    builder.Append("\\u").Append(((int)character).ToString("x4"));
+                    break;
+                default:
+                    builder.Append(character);
+                    break;
+            }
+        }
+        return builder.Append('"').ToString();
+    }
 
     private static (string[] Arguments, bool Found) RemoveFlag(string[] args, string flag)
     {
